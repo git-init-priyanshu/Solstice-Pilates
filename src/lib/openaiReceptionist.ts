@@ -1,16 +1,15 @@
 import OpenAI from 'openai'
 
-export type ReceptionistChatMessage = {
+export type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
 }
 
-type ReceptionistReplyInput = {
-  apiKey?: string
-  messages: ReceptionistChatMessage[]
+type LLMReplyInput = {
+  messages: ChatMessage[]
 }
 
-const receptionistInstructions = `
+const llmInstructions = `
 You are the AI receptionist for Solstice Pilates, a small pilates studio.
 Be warm, concise, and practical.
 Help clients with class questions, new client onboarding, pricing questions,
@@ -20,26 +19,15 @@ name, phone number, and email if missing.
 Do not claim a booking is confirmed unless calendar availability has been checked.
 `
 
-function getOpenRouterApiKey(apiKey?: string) {
-  return apiKey?.trim() || import.meta.env.VITE_OPENROUTER_API_KEY
-}
+export async function getLLMReply({ messages }: LLMReplyInput) {
+  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY
 
-function getOpenRouterModel() {
-  return import.meta.env.VITE_OPENROUTER_MODEL || 'openai/gpt-4o-mini'
-}
-
-export async function getReceptionistReply({
-  apiKey,
-  messages,
-}: ReceptionistReplyInput) {
-  const resolvedApiKey = getOpenRouterApiKey(apiKey)
-
-  if (!resolvedApiKey) {
+  if (!apiKey) {
     throw new Error('Add an OpenRouter API key to chat with the receptionist.')
   }
 
   const client = new OpenAI({
-    apiKey: resolvedApiKey,
+    apiKey: apiKey,
     baseURL: 'https://openrouter.ai/api/v1',
     dangerouslyAllowBrowser: true,
     defaultHeaders: {
@@ -51,11 +39,11 @@ export async function getReceptionistReply({
   })
 
   const response = await client.chat.completions.create({
-    model: getOpenRouterModel(),
+    model: import.meta.env.VITE_OPENROUTER_MODEL,
     messages: [
       {
         role: 'system',
-        content: receptionistInstructions,
+        content: llmInstructions,
       },
       ...messages,
     ],

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { CalendarDays, Paperclip, Phone, Send, Video } from 'lucide-react'
 
 import './App.css'
@@ -12,21 +12,36 @@ import {
   scheduleCalendarEvent,
   updateSheetValues,
 } from '@/lib/googleWorkspace'
+import {
+  getReceptionistReply,
+  type ReceptionistChatMessage,
+} from '@/lib/openaiReceptionist'
 
-const messages = [
+type ChatMessage = {
+  id: string
+  sender: string
+  text: string
+  time: string
+  mine: boolean
+}
+
+const initialMessages: ChatMessage[] = [
   {
+    id: 'welcome-message',
     sender: 'Solstice Pilates',
     text: 'Hi, I am the Solstice Pilates AI receptionist. How can I help today?',
     time: '10:36 AM',
     mine: false,
   },
   {
+    id: 'example-user-message',
     sender: 'You',
     text: 'I would like to book a beginner reformer class.',
     time: '10:38 AM',
     mine: true,
   },
   {
+    id: 'example-assistant-message',
     sender: 'Solstice Pilates',
     text: 'Of course. We have beginner-friendly openings this week. Would you prefer a morning or evening class?',
     time: '10:39 AM',
@@ -35,6 +50,17 @@ const messages = [
 ]
 
 const defaultTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+function createMessageId() {
+  return crypto.randomUUID()
+}
+
+function getCurrentTime() {
+  return new Intl.DateTimeFormat('en', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date())
+}
 
 function asGoogleDateTime(value: string) {
   if (!value) {
@@ -60,6 +86,10 @@ function parseSheetValues(value: string) {
 }
 
 function App() {
+  const [messages, setMessages] = useState(initialMessages)
+  const [chatInput, setChatInput] = useState('')
+  const [openRouterApiKey, setOpenRouterApiKey] = useState('')
+  const [isChatLoading, setIsChatLoading] = useState(false)
   const [accessToken, setAccessToken] = useState('')
   const [calendarId, setCalendarId] = useState('primary')
   const [calendarStart, setCalendarStart] = useState('')
@@ -76,6 +106,67 @@ function App() {
   const [dimensionEnd, setDimensionEnd] = useState('1')
   const [sheetResult, setSheetResult] = useState('No sheet action yet.')
   const [isWorking, setIsWorking] = useState(false)
+
+  async function handleChatSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const trimmedInput = chatInput.trim()
+
+    if (!trimmedInput || isChatLoading) {
+      return
+    }
+
+    const userMessage: ChatMessage = {
+      id: createMessageId(),
+      sender: 'You',
+      text: trimmedInput,
+      time: getCurrentTime(),
+      mine: true,
+    }
+    const nextMessages = [...messages, userMessage]
+
+    setMessages(nextMessages)
+    setChatInput('')
+    setIsChatLoading(true)
+
+    try {
+      const modelMessages: ReceptionistChatMessage[] = nextMessages.map((message) => ({
+        role: message.mine ? 'user' : 'assistant',
+        content: message.text,
+      }))
+      const reply = await getReceptionistReply({
+        apiKey: openRouterApiKey,
+        messages: modelMessages,
+      })
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          id: createMessageId(),
+          sender: 'Solstice Pilates',
+          text: reply,
+          time: getCurrentTime(),
+          mine: false,
+        },
+      ])
+    } catch (error) {
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          id: createMessageId(),
+          sender: 'Solstice Pilates',
+          text:
+            error instanceof Error
+              ? error.message
+              : 'I could not connect to the AI receptionist.',
+          time: getCurrentTime(),
+          mine: false,
+        },
+      ])
+    } finally {
+      setIsChatLoading(false)
+    }
+  }
 
   async function runAction(action: () => Promise<unknown>, setResult: (value: string) => void) {
     try {
@@ -147,7 +238,7 @@ function App() {
                 {messages.map((message) => (
                   <article
                     className={`flex ${message.mine ? 'justify-end' : 'justify-start'}`}
-                    key={`${message.sender}-${message.time}`}
+                    key={message.id}
                   >
                     <div
                       className={`max-w-[78%] rounded-lg px-4 py-3 text-left shadow-sm ${
@@ -167,21 +258,38 @@ function App() {
                     </div>
                   </article>
                 ))}
+                {isChatLoading && (
+                  <article className="flex justify-start">
+                    <div className="rounded-lg border border-blue-100 bg-white px-4 py-3 text-left text-sm text-slate-500 shadow-sm">
+                      Solstice Pilates is typing...
+                    </div>
+                  </article>
+                )}
               </div>
             </div>
 
-            <form className="flex items-end gap-2 border-t border-blue-100 bg-white p-3">
+            <form
+              className="flex items-end gap-2 border-t border-blue-100 bg-white p-3"
+              onSubmit={handleChatSubmit}
+            >
               <Button size="icon" variant="ghost" type="button" aria-label="Attach file">
                 <Paperclip />
               </Button>
               <textarea
                 className="min-h-10 flex-1 resize-none rounded-md border border-blue-100 bg-white px-3 py-2 text-sm leading-5 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                disabled={isChatLoading}
+                onChange={(event) => setChatInput(event.target.value)}
                 placeholder="Ask about classes, booking, pricing, or call the studio"
                 rows={1}
+                value={chatInput}
               />
-              <Button type="submit" aria-label="Send message">
+              <Button
+                disabled={isChatLoading || !chatInput.trim()}
+                type="submit"
+                aria-label="Send message"
+              >
                 <Send />
-                Send
+                {isChatLoading ? 'Sending' : 'Send'}
               </Button>
             </form>
           </section>
@@ -193,7 +301,17 @@ function App() {
               Workspace tools
             </h2>
             <label className="mt-3 block text-left text-sm font-medium text-slate-700">
-              Access token
+              OpenRouter API key
+              <input
+                className="mt-1 h-9 w-full rounded-md border border-blue-100 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                onChange={(event) => setOpenRouterApiKey(event.target.value)}
+                placeholder="Uses VITE_OPENROUTER_API_KEY if empty"
+                type="password"
+                value={openRouterApiKey}
+              />
+            </label>
+            <label className="mt-3 block text-left text-sm font-medium text-slate-700">
+              Google access token
               <input
                 className="mt-1 h-9 w-full rounded-md border border-blue-100 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 onChange={(event) => setAccessToken(event.target.value)}

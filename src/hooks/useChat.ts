@@ -1,98 +1,104 @@
-import { useState, type FormEvent } from 'react'
+"use client";
 
-import {
-  getLLMReply,
-  type ChatMessage as LLMChatMessage,
-} from '@/lib/openaiReceptionist'
-import type { ChatMessage } from '@/types/chat'
+import { useState, type FormEvent } from "react";
+
+import type { ChatMessage } from "@/types/chat.types";
+import type { OpenAIChatMessage } from "@/types/openai.types";
+
+import { useOpenAi } from "@/hooks/useOpenAi";
+import { createChatId, getOrCreateUserId } from "@/lib/clientIdentity";
 
 function createMessageId() {
-  return crypto.randomUUID()
+  return crypto.randomUUID();
 }
 
 function getCurrentTime() {
-  return new Intl.DateTimeFormat('en', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date())
+  return new Intl.DateTimeFormat("en", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date());
 }
 
 export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [chatInput, setChatInput] = useState('')
-  const [isChatLoading, setIsChatLoading] = useState(false)
+  const { getLLMReply } = useOpenAi();
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatId] = useState(createChatId);
+  const [chatInput, setChatInput] = useState("");
+  const [isReplying, setIsReplying] = useState(false);
 
   async function submitChatMessage() {
-    const trimmedInput = chatInput.trim()
+    const trimmedInput = chatInput.trim();
 
-    if (!trimmedInput || isChatLoading) {
-      return
+    if (!trimmedInput || isReplying) {
+      return;
     }
 
     const userMessage: ChatMessage = {
       id: createMessageId(),
-      sender: 'You',
+      sender: "User",
       text: trimmedInput,
       time: getCurrentTime(),
-      mine: true,
-    }
-    const nextMessages = [...messages, userMessage]
+    };
+    const nextMessages = [...messages, userMessage];
 
-    setMessages(nextMessages)
-    setChatInput('')
-    setIsChatLoading(true)
+    setMessages(nextMessages);
+    setChatInput("");
+    setIsReplying(true);
 
     try {
-      const modelMessages: LLMChatMessage[] = nextMessages.map(
+      const modelMessages: OpenAIChatMessage[] = nextMessages.map(
         (message) => ({
-          role: message.mine ? 'user' : 'assistant',
+          role: message.sender === "User" ? "user" : "assistant",
           content: message.text,
         }),
-      )
-      const reply = await getLLMReply({ messages: modelMessages })
+      );
+      const reply = await getLLMReply({
+        chatId,
+        messages: modelMessages,
+        userId: getOrCreateUserId(),
+      });
 
       setMessages((currentMessages) => [
         ...currentMessages,
         {
           id: createMessageId(),
-          sender: 'Solstice Pilates',
+          sender: "LLM",
           text: reply,
           time: getCurrentTime(),
-          mine: false,
         },
-      ])
+      ]);
     } catch (error) {
       setMessages((currentMessages) => [
         ...currentMessages,
         {
           id: createMessageId(),
-          sender: 'Solstice Pilates',
+          sender: "LLM",
           text:
             error instanceof Error
               ? error.message
-              : 'I could not connect to the AI receptionist.',
+              : "Sorry for the inconvinience the server seems to be down.",
           time: getCurrentTime(),
-          mine: false,
         },
-      ])
+      ]);
     } finally {
-      setIsChatLoading(false)
+      setIsReplying(false);
     }
   }
 
   function handleChatSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    submitChatMessage()
+    event.preventDefault();
+    submitChatMessage();
   }
 
   return {
     chatInput,
     handleChatSubmit,
-    isChatLoading,
+    isReplying,
     messages,
     setChatInput,
     submitChatMessage,
-  }
+  };
 }
 
-export type Chat = ReturnType<typeof useChat>
+export type Chat = ReturnType<typeof useChat>;

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "@/index.css";
 
 export const metadata: Metadata = {
-  title: "Solstice Pilates Receptionist",
-  description: "AI receptionist for Solstice Pilates",
+  title: "Solstice Pilates Assistant",
+  description: "AI assistant for Solstice Pilates",
 };
 
 export default function RootLayout({

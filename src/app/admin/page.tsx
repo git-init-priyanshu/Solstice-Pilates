@@ -8,7 +8,6 @@ export default function AdminPage() {
           <ChatPanel
             apiPath="/api/admin/chat"
             placeholder="Create an event, for example Pilates class today from 2 PM to 5 PM"
-            showStudioActions={false}
             subtitle="Admin assistant"
             title="Solstice Pilates Admin"
             typingLabel="Admin assistant is typing..."

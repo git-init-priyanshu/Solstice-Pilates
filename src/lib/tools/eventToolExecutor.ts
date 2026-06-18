@@ -1,47 +1,37 @@
 import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
-import { createCalendarClient } from "@/hooks/useCalendar";
-import { createSheetClient } from "@/hooks/useSheet";
-import type { ToolArgs, ToolResult } from "@/types/tools.types";
+import { useSheet } from "@/hooks/useSheet";
+import { getGoogleAccessToken } from "@/lib/googleApi";
+import type { EventRecord } from "@/types/event.types";
+import type { ToolResult } from "@/types/tools.types";
+import { scheduleCalendarEvent, updateCalendarEvent } from "@/lib/calendarApi";
 
-const { createEventRecord, listEventsInRange } = createSheetClient();
 const {
-  cancelCalendarEvent,
-  getCalendarId,
-  requireGoogleAccessToken,
-  scheduleCalendarEvent,
-} = createCalendarClient();
-
-function getIntentForTool(name: string) {
-  switch (name) {
-    case "create_event_record":
-      return "admin_event_create";
-    case "list_events_in_range":
-      return "event_lookup";
-    default:
-      return undefined;
-  }
-}
+  createEventRecord,
+  findEventById,
+  listEventsInRange,
+  updateEventRecord,
+} = useSheet();
 
 export async function executeEventTool(
   toolCall: ChatCompletionMessageFunctionToolCall,
 ): Promise<ToolResult> {
   try {
-    const args = toolCall.function.arguments
-      ? (JSON.parse(toolCall.function.arguments) as ToolArgs)
-      : {};
+    const args = JSON.parse(toolCall.function.arguments);
 
     switch (toolCall.function.name) {
       case "create_event_record": {
-        const name = args["name"] as string;
-        const startTime = args["startTime"] as string;
-        const endTime = args["endTime"] as string;
+        const name = args["name"];
+        const startTime = args["startTime"];
+        const endTime = args["endTime"];
         const pricingPerHour = Number(args["pricingPerHour"]);
         const capacity = Number(args["capacity"]);
-        const accessToken = await requireGoogleAccessToken();
+
+        // Create event in calendar
+        const accessToken = await getGoogleAccessToken();
         const calendarEvent = await scheduleCalendarEvent({
           accessToken,
-          calendarId: getCalendarId(),
+          calendarId: "primary",
           summary: name,
           startDateTime: startTime,
           endDateTime: endTime,
@@ -52,39 +42,84 @@ export async function executeEventTool(
           throw new Error("Google Calendar did not return an event ID.");
         }
 
-        try {
-          const eventRecord = await createEventRecord({
-            eventId: calendarEvent.id,
-            name,
-            startTime,
-            endTime,
-            pricingPerHour,
-            capacity,
-          });
+        // Append event data in sheet
+        const eventRecord = await createEventRecord({
+          eventId: calendarEvent.id,
+          name,
+          startTime,
+          endTime,
+          pricingPerHour,
+          capacity,
+        });
 
-          return {
-            ok: true,
-            message: "create_event_record completed",
-            data: {
-              calendarEvent,
-              eventRecord,
-            },
-            intent: "admin_event_create",
-          };
-        } catch (error) {
-          await cancelCalendarEvent({
-            accessToken,
-            calendarId: getCalendarId(),
-            eventId: calendarEvent.id,
-          });
+        return {
+          ok: true,
+          message: "create_event_record completed",
+          data: {
+            calendarEvent,
+            eventRecord,
+          },
+          intent: "admin_event_create",
+        };
+      }
 
-          throw error;
+      case "update_event_record": {
+        const eventId = args["eventId"] as string;
+
+        const existingEvent = await findEventById(eventId);
+        if (!existingEvent) {
+          throw new Error("The selected class event could not be found.");
         }
+
+        const updatedEvent: EventRecord = {
+          ...existingEvent,
+          name: args["name"] ?? existingEvent.name,
+          startTime: args["startTime"] ?? existingEvent.startTime,
+          endTime: args["endTime"] ?? existingEvent.endTime,
+          pricingPerHour: Number(
+            args["pricingPerHour"] ?? existingEvent.pricingPerHour,
+          ),
+          capacity: Number(args["capacity"] ?? existingEvent.capacity),
+        };
+
+        const shouldUpdateCalendar =
+          updatedEvent.name !== existingEvent.name ||
+          updatedEvent.startTime !== existingEvent.startTime ||
+          updatedEvent.endTime !== existingEvent.endTime;
+
+        let updatedCalendarEvent = null;
+        if (shouldUpdateCalendar) {
+          const accessToken = await getGoogleAccessToken();
+          updatedCalendarEvent = await updateCalendarEvent({
+            accessToken,
+            calendarId: "primary",
+            eventId,
+            summary: updatedEvent.name,
+            startDateTime: updatedEvent.startTime,
+            endDateTime: updatedEvent.endTime,
+          });
+        }
+
+        // Update event in sheet
+        const eventRecord = await updateEventRecord(updatedEvent);
+
+        return {
+          ok: true,
+          message: "update_event_record completed",
+          data: {
+            ...(updatedCalendarEvent ? { updatedCalendarEvent } : {}),
+            eventRecord,
+            previousEvent: existingEvent,
+          },
+          intent: "admin_event_update",
+        };
       }
 
       case "list_events_in_range": {
         const startTime = args["startTime"] as string;
         const endTime = args["endTime"] as string;
+
+        // Get all event in specified range sorted.
         const data = await listEventsInRange({
           startTime,
           endTime,
@@ -94,20 +129,8 @@ export async function executeEventTool(
           ok: true,
           message: "list_events_in_range completed",
           data: {
-            events: data.map((event) => ({
-              ...event,
-              availabilityStatus:
-                event.bookedCustomers < event.capacity ? "available" : "full",
-              remainingSpots: Math.max(event.capacity - event.bookedCustomers, 0),
-            })),
+            events: data,
             count: data.length,
-            hasEvents: data.length > 0,
-            interpretation:
-              data.length > 0
-                ? "One or more classes are scheduled in this time window."
-                : "No classes are scheduled in this time window.",
-            guidance:
-              "Use capacity and bookedCustomers to answer availability. Use pricingPerHour to answer pricing questions.",
           },
           intent: "event_lookup",
         };
@@ -122,8 +145,15 @@ export async function executeEventTool(
   } catch (error) {
     return {
       ok: false,
-      intent: getIntentForTool(toolCall.function.name),
-      message: error instanceof Error ? error.message : "Event tool failed",
+      intent:
+        toolCall.function.name === "create_event_record"
+          ? "admin_event_create"
+          : toolCall.function.name === "update_event_record"
+            ? "admin_event_update"
+            : toolCall.function.name === "list_events_in_range"
+              ? "event_lookup"
+              : undefined,
+      message: "Event tool failed",
     };
   }
 }

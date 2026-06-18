@@ -2,22 +2,11 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 
-import type { ChatMessage } from "@/types/chat.types";
+import type { ChatMessage, UseChatOptions } from "@/types/chat.types";
 import type { OpenAIChatMessage } from "@/types/openai.types";
-import type { ChatSessionBootstrap, UserProfile } from "@/types/session.types";
+import type { ChatSessionInit, UserProfile } from "@/types/session.types";
 
 import { useOpenAi } from "@/hooks/useOpenAi";
-import { createChatId, getOrCreateUserId } from "@/lib/clientIdentity";
-
-type UseChatOptions = {
-  apiPath?: string;
-  sessionApiPath?: string;
-  userIdStorageKey?: string;
-};
-
-function createMessageId() {
-  return crypto.randomUUID();
-}
 
 function getCurrentTime() {
   return new Intl.DateTimeFormat("en", {
@@ -26,123 +15,99 @@ function getCurrentTime() {
   }).format(new Date());
 }
 
-function toChatMessages(messages: OpenAIChatMessage[]) {
-  return messages.map<ChatMessage>((message) => ({
-    id: createMessageId(),
-    sender: message.role === "user" ? "User" : "LLM",
-    text: message.content,
-  }));
-}
-
-function createEmptyProfile() {
-  return {
-    name: "",
-    email: "",
-    phone: "",
-  };
-}
-
-function getErrorMessage(payload: unknown, fallback: string) {
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "message" in payload &&
-    typeof payload.message === "string"
-  ) {
-    return payload.message;
-  }
-
-  return fallback;
-}
-
 export function useChat({
-  apiPath = "/api/chat",
-  sessionApiPath = "/api/chat/session",
+  apiPath,
+  sessionApiPath,
   userIdStorageKey,
-}: UseChatOptions = {}) {
+}: UseChatOptions) {
   const { getLLMReply } = useOpenAi();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState("");
   const [chatInput, setChatInput] = useState("");
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [isReplying, setIsReplying] = useState(false);
-  const [profile, setProfile] =
-    useState<Pick<UserProfile, "email" | "name" | "phone">>(createEmptyProfile);
+  const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<
+    Pick<UserProfile, "email" | "name" | "phone">
+  >({
+    name: "",
+    email: "",
+    phone: "",
+  });
   const [userId, setUserId] = useState("");
+  const storageKey = userIdStorageKey || "solstice_pilates_user_id";
 
   useEffect(() => {
-    let isActive = true;
+    async function loadSession() {
+      const existingUserId = localStorage.getItem(storageKey);
 
-    async function bootstrapSession() {
-      const nextUserId = getOrCreateUserId(userIdStorageKey);
+      if (!existingUserId) {
+        const newUserId = crypto.randomUUID();
+        localStorage.setItem(storageKey, newUserId);
 
-      setUserId(nextUserId);
+        setUserId(newUserId);
+        setChatId(crypto.randomUUID());
+        setIsLoading(false);
+        return;
+      }
+
+      setUserId(existingUserId);
 
       try {
         const response = await fetch(
-          `${sessionApiPath}?userId=${encodeURIComponent(nextUserId)}`,
+          `${sessionApiPath}?userId=${existingUserId}`,
         );
-        const payload = (await response.json()) as unknown;
+        const payload = await response.json();
 
         if (!response.ok) {
-          throw new Error(getErrorMessage(payload, "Unable to load the session."));
+          throw new Error("Unable to load the session.");
         }
 
-        if (!isActive) {
-          return;
-        }
-
-        const session = payload as ChatSessionBootstrap;
+        const session = payload as ChatSessionInit;
 
         setChatId(session.chat.id);
-        setMessages(toChatMessages(session.messages));
+        setMessages(
+          session.messages.map<ChatMessage>((message) => ({
+            id: crypto.randomUUID(),
+            sender: message.role === "user" ? "User" : "LLM",
+            text: message.content,
+          })),
+        );
         setProfile({
           email: session.user.email,
           name: session.user.name,
           phone: session.user.phone,
         });
       } catch {
-        if (!isActive) {
-          return;
-        }
-
-        setChatId(createChatId());
+        setChatId(crypto.randomUUID());
       } finally {
-        if (isActive) {
-          setIsBootstrapping(false);
-        }
+        setIsLoading(false);
       }
     }
 
-    bootstrapSession();
-
-    return () => {
-      isActive = false;
-    };
-  }, [sessionApiPath, userIdStorageKey]);
+    loadSession();
+  }, [sessionApiPath, storageKey]);
 
   async function submitChatMessage() {
     const trimmedInput = chatInput.trim();
 
-    if (!trimmedInput || isBootstrapping || isReplying || !chatId || !userId) {
+    if (!trimmedInput || isLoading || !chatId || !userId) {
       return;
     }
 
     const userMessage: ChatMessage = {
-      id: createMessageId(),
+      id: crypto.randomUUID(),
       sender: "User",
       text: trimmedInput,
       time: getCurrentTime(),
     };
-    const nextMessages = [...messages, userMessage];
+    const allMessages = [...messages, userMessage];
 
-    setMessages(nextMessages);
+    setMessages(allMessages);
     setChatInput("");
-    setIsReplying(true);
+    setIsLoading(true);
 
     try {
-      const modelMessages: OpenAIChatMessage[] = nextMessages.map((message) => ({
+      const modelMessages: OpenAIChatMessage[] = allMessages.map((message) => ({
         role: message.sender === "User" ? "user" : "assistant",
         content: message.text,
       }));
@@ -157,27 +122,24 @@ export function useChat({
       setMessages((currentMessages) => [
         ...currentMessages,
         {
-          id: createMessageId(),
+          id: crypto.randomUUID(),
           sender: "LLM",
           text: reply,
           time: getCurrentTime(),
         },
       ]);
-    } catch (error) {
+    } catch {
       setMessages((currentMessages) => [
         ...currentMessages,
         {
-          id: createMessageId(),
+          id: crypto.randomUUID(),
           sender: "LLM",
-          text:
-            error instanceof Error
-              ? error.message
-              : "Sorry, the server seems to be down.",
+          text: "Sorry, the server seems to be down.",
           time: getCurrentTime(),
         },
       ]);
     } finally {
-      setIsReplying(false);
+      setIsLoading(false);
     }
   }
 
@@ -189,12 +151,9 @@ export function useChat({
   return {
     chatInput,
     handleChatSubmit,
-    isBootstrapping,
-    isReplying,
+    isLoading,
     messages,
     setChatInput,
     submitChatMessage,
   };
 }
-
-export type Chat = ReturnType<typeof useChat>;

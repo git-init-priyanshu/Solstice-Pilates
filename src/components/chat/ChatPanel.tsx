@@ -1,29 +1,18 @@
 "use client";
 
 import { type KeyboardEvent } from "react";
-import { Send } from "lucide-react";
+import { LoaderCircle, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import ChatHeader from "@/components/chat/ChatHeader";
 import { useChat } from "@/hooks/useChat";
-
-type ChatPanelProps = {
-  apiPath?: string;
-  placeholder?: string;
-  sessionApiPath?: string;
-  showStudioActions?: boolean;
-  subtitle?: string;
-  title?: string;
-  typingLabel?: string;
-  userIdStorageKey?: string;
-};
+import type { ChatPanelProps } from "@/types/chat.types";
 
 export function ChatPanel({
-  apiPath,
+  apiPath = "/api/chat",
   placeholder = "Ask about classes, booking, pricing, or call the studio",
-  sessionApiPath,
-  showStudioActions = true,
-  subtitle = "AI receptionist",
+  sessionApiPath = "/api/chat/session",
+  subtitle = "AI assistant",
   title = "Solstice Pilates",
   typingLabel = "Solstice Pilates is typing...",
   userIdStorageKey,
@@ -31,8 +20,7 @@ export function ChatPanel({
   const {
     chatInput,
     handleChatSubmit,
-    isBootstrapping,
-    isReplying,
+    isLoading,
     messages,
     setChatInput,
     submitChatMessage,
@@ -49,17 +37,16 @@ export function ChatPanel({
     }
   }
 
+  const lastMessage = messages[messages.length - 1];
+  const isAwaitingReply = isLoading && lastMessage?.sender === "User";
+
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <ChatHeader
-        showStudioActions={showStudioActions}
-        subtitle={subtitle}
-        title={title}
-      />
+      <ChatHeader subtitle={subtitle} title={title} />
       <div className="min-h-0 flex-1 overflow-y-auto bg-blue-50 px-4 py-5">
         <div className="flex flex-col gap-4">
           {messages.map((message) => (
-            <article
+            <div
               className={`flex ${message.sender === "User" ? "justify-end" : "justify-start"}`}
               key={message.id}
             >
@@ -83,14 +70,14 @@ export function ChatPanel({
                   </span>
                 ) : null}
               </div>
-            </article>
+            </div>
           ))}
-          {isReplying && (
-            <article className="flex justify-start">
+          {isAwaitingReply && (
+            <div className="flex justify-start">
               <div className="rounded-lg border border-blue-100 bg-white px-4 py-3 text-left text-sm text-slate-500 shadow-sm">
                 {typingLabel}
               </div>
-            </article>
+            </div>
           )}
         </div>
       </div>
@@ -102,7 +89,7 @@ export function ChatPanel({
         <div className="flex items-end gap-2">
           <textarea
             className="min-h-10 flex-1 resize-none rounded-md border border-blue-100 bg-white px-3 py-2 text-sm leading-5 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            disabled={isBootstrapping || isReplying}
+            disabled={isLoading}
             onChange={(event) => setChatInput(event.target.value)}
             placeholder={placeholder}
             rows={1}
@@ -111,11 +98,15 @@ export function ChatPanel({
           />
           <Button
             aria-label="Send message"
-            disabled={isBootstrapping || isReplying || !chatInput.trim()}
+            disabled={isLoading || !chatInput.trim()}
             type="submit"
           >
-            <Send />
-            {isReplying ? "Sending" : "Send"}
+            {isLoading ? (
+              <LoaderCircle className="animate-spin" />
+            ) : (
+              <Send />
+            )}
+            {isLoading ? "Sending" : "Send"}
           </Button>
         </div>
       </form>

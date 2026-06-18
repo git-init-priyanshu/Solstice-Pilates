@@ -1,17 +1,8 @@
-import type { OpenAIChatMessage } from "@/types/openai.types";
-import type { UserProfile } from "@/types/session.types";
-
-type LLMReplyInput = {
-  apiPath?: string;
-  chatId: string;
-  messages: OpenAIChatMessage[];
-  userId: string;
-  userProfile: Pick<UserProfile, "email" | "name" | "phone">;
-};
+import type { LLMReplyInput } from "@/types/chat.types";
 
 export function useOpenAi() {
   async function getLLMReply({
-    apiPath = "/api/chat",
+    apiPath,
     chatId,
     messages,
     userId,
@@ -25,13 +16,10 @@ export function useOpenAi() {
       body: JSON.stringify({ chatId, messages, userId, userProfile }),
     });
 
-    const payload = (await response.json()) as {
-      reply?: string;
-      message?: string;
-    };
+    const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload.message || "Unable to reach the receptionist.");
+      throw new Error(payload.message || "Unable to reach the assistant.");
     }
 
     return (

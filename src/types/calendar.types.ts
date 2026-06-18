@@ -26,6 +26,13 @@ export type CalendarRescheduleInput = CalendarCancelInput & {
   endDateTime: string;
 };
 
+export type CalendarUpdateInput = CalendarCancelInput & {
+  summary?: string;
+  startDateTime?: string;
+  endDateTime?: string;
+  description?: string;
+};
+
 export type CalendarEventTime = {
   date?: string;
   dateTime?: string;
@@ -39,10 +46,6 @@ export type CalendarListEvent = {
   start?: CalendarEventTime;
   status?: string;
   summary?: string;
-};
-
-export type CalendarEventsListResponse = {
-  items?: CalendarListEvent[];
 };
 
 export type CalendarEventResponse = {

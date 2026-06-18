@@ -1,66 +1,23 @@
-type GoogleApiRequestInit = RequestInit & {
-  accessToken: string;
-};
-
-type GoogleApiErrorResponse = {
-  error?: {
-    code?: number;
-    message?: string;
-    status?: string;
-  };
-};
-
-function formatGoogleApiError(status: number, errorText: string) {
-  if (!errorText) {
-    return `Google API request failed: ${status}`;
-  }
-
-  try {
-    const payload = JSON.parse(errorText) as GoogleApiErrorResponse;
-    const error = payload.error;
-
-    if (error?.message) {
-      return [
-        `Google API request failed: ${error.code || status}`,
-        error.status,
-        error.message,
-      ]
-        .filter(Boolean)
-        .join(" - ");
-    }
-  } catch {
-    return errorText;
-  }
-
-  return errorText;
-}
-
-async function googleApi<T>(
-  url: string,
-  init: GoogleApiRequestInit,
-): Promise<T> {
-  const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${init.accessToken}`);
-
-  if (init.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const response = await fetch(url, {
-    ...init,
-    headers,
+export async function getGoogleAccessToken() {
+  const body = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID || "",
+    client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN || "",
+    grant_type: "refresh_token",
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(formatGoogleApiError(response.status, errorText));
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.access_token) {
+    throw new Error("Unable to refresh Google access token");
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
+  return payload.access_token;
 }
-
-export { googleApi };

@@ -22,7 +22,7 @@ export type ChatSessionRecord = {
   updatedAt: string;
 };
 
-export type ChatSessionBootstrap = {
+export type ChatSessionInit = {
   user: UserProfile;
   chat: ChatSessionRecord;
   messages: OpenAIChatMessage[];

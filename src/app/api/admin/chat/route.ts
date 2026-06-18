@@ -1,62 +1,25 @@
-import type {
-  ChatCompletionAssistantMessageParam,
-  ChatCompletionMessageParam,
-} from "openai/resources/chat/completions";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-import { createSheetClient } from "@/hooks/useSheet";
-import {
-  adminInstructions,
-  maxToolRounds,
-} from "@/lib/chat/chatConstants";
+import { useSheet } from "@/hooks/useSheet";
+import { adminInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
 import {
   createCurrentDateContext,
-  type ChatRequestBody,
-} from "@/lib/chat/chatRuntime";
-import {
   createOpenAIClient,
-  getModel,
-  isValidMessage,
 } from "@/lib/chat/chatHelpers";
 import { adminEventTools } from "@/lib/tools/event";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
+import type { ChatRequestBody } from "@/types/chat.types";
 
-const { upsertChatSession, upsertUserProfile } = createSheetClient();
-
-async function persistConversation({
-  chatId,
-  lastIntent,
-  messages,
-  reply,
-  userId,
-}: {
-  chatId: string;
-  lastIntent: string;
-  messages: ChatRequestBody["messages"];
-  reply: string;
-  userId?: string;
-}) {
-  await upsertChatSession({
-    chatId,
-    conversation: JSON.stringify([
-      ...(messages || []),
-      {
-        role: "assistant",
-        content: reply,
-      },
-    ]),
-    lastIntent,
-    userId: userId || "",
-  });
-}
+const { upsertChatSession, upsertUserProfile } = useSheet();
 
 export async function POST(request: Request) {
   try {
     const body: ChatRequestBody = await request.json();
-    const messages = Array.isArray(body.messages)
-      ? body.messages.filter(isValidMessage)
-      : [];
+    const messages = body.messages?.filter(
+      (message) => message.role === "user" || message.role === "assistant",
+    ) ?? [];
 
-    if (messages.length === 0) {
+    if (!messages.length) {
       return Response.json(
         { message: "At least one admin message is required." },
         { status: 400 },
@@ -64,8 +27,8 @@ export async function POST(request: Request) {
     }
 
     const toolContext = {
-      chatId: body.chatId || crypto.randomUUID(),
-      userId: body.userId || undefined,
+      chatId: body.chatId ?? crypto.randomUUID(),
+      userId: body.userId,
     };
 
     if (toolContext.userId) {
@@ -88,7 +51,7 @@ export async function POST(request: Request) {
 
     for (let round = 0; round < maxToolRounds; round += 1) {
       const response = await client.chat.completions.create({
-        model: getModel(),
+        model: "openai/gpt-4o-mini",
         messages: conversationMemory,
         tools: adminEventTools,
         tool_choice: "auto",
@@ -101,33 +64,30 @@ export async function POST(request: Request) {
 
       const toolCalls = llmMessage.tool_calls ?? [];
 
-      if (toolCalls.length === 0) {
-        const reply =
-          llmMessage.content ||
-          "I can help with that. Could you share a little more detail?";
+      if (!toolCalls.length) {
+        const reply = llmMessage.content;
 
-        try {
-          await persistConversation({
-            chatId: toolContext.chatId,
-            lastIntent,
-            messages,
-            reply,
-            userId: toolContext.userId,
-          });
-        } catch {
-          // Session logging is best-effort so admin replies still return.
-        }
+        await upsertChatSession({
+          chatId: toolContext.chatId,
+          conversation: JSON.stringify([
+            ...messages,
+            {
+              role: "assistant",
+              content: reply,
+            },
+          ]),
+          lastIntent,
+          userId: toolContext.userId || "",
+        });
 
         return Response.json({ reply });
       }
 
-      const llmToolMessage: ChatCompletionAssistantMessageParam = {
+      conversationMemory.push({
         role: "assistant",
         content: llmMessage.content,
         tool_calls: toolCalls,
-      };
-
-      conversationMemory.push(llmToolMessage);
+      });
 
       for (const toolCall of toolCalls) {
         if (toolCall.type !== "function") {
@@ -136,9 +96,7 @@ export async function POST(request: Request) {
 
         const result = await executeEventTool(toolCall);
 
-        if (result.intent) {
-          lastIntent = result.intent;
-        }
+        lastIntent = result.intent ?? "";
 
         conversationMemory.push({
           role: "tool",
@@ -148,29 +106,16 @@ export async function POST(request: Request) {
       }
     }
 
-    const reply =
-      "I need a moment to finish that. Please try again with the exact event details.";
-
-    try {
-      await persistConversation({
-        chatId: toolContext.chatId,
-        lastIntent,
-        messages,
-        reply,
-        userId: toolContext.userId,
-      });
-    } catch {
-      // Session logging is best-effort so admin replies still return.
-    }
-
-    return Response.json({ reply });
+    return Response.json(
+      {
+        message: "The assistant is taking too long to process the request.",
+      },
+      { status: 500 },
+    );
   } catch (error) {
     return Response.json(
       {
-        message:
-          error instanceof Error
-            ? error.message
-            : "The admin assistant could not reply.",
+        message: "The admin assistant could not reply.",
       },
       { status: 500 },
     );

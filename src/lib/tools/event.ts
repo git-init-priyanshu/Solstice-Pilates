@@ -66,5 +66,46 @@ export const adminEventTools: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "update_event_record",
+      description:
+        "Update an existing studio event in Google Calendar and the Event sheet after the admin identifies the event and provides one or more changed fields such as name, start time, end time, pricing per hour, or capacity.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          eventId: {
+            type: "string",
+            description: "Existing Event sheet event_id for the class.",
+          },
+          name: {
+            type: "string",
+            description: "Updated event name.",
+          },
+          startTime: {
+            type: "string",
+            description:
+              "Updated event start time as an RFC3339 date-time with timezone.",
+          },
+          endTime: {
+            type: "string",
+            description:
+              "Updated event end time as an RFC3339 date-time with timezone.",
+          },
+          pricingPerHour: {
+            type: "number",
+            description: "Updated event price per hour.",
+          },
+          capacity: {
+            type: "integer",
+            description: "Updated maximum number of customers who can book this class.",
+          },
+        },
+        required: ["eventId"],
+      },
+    },
+  },
   ...eventLookupTools,
 ];

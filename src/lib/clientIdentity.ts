@@ -10,15 +10,15 @@ function createUuid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function getOrCreateUserId() {
-  const existingUserId = localStorage.getItem(userIdStorageKey);
+export function getOrCreateUserId(storageKey = userIdStorageKey) {
+  const existingUserId = localStorage.getItem(storageKey);
 
   if (existingUserId) {
     return existingUserId;
   }
 
   const userId = createUuid();
-  localStorage.setItem(userIdStorageKey, userId);
+  localStorage.setItem(storageKey, userId);
 
   return userId;
 }

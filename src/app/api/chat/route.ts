@@ -3,26 +3,59 @@ import type {
   ChatCompletionMessageParam,
 } from "openai/resources/chat/completions";
 
-import { calendarTools } from "@/lib/tools/calendar";
+import { bookingTools } from "@/lib/tools/booking";
+import { eventLookupTools } from "@/lib/tools/event";
 import { createSheetClient } from "@/hooks/useSheet";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 
-import { maxToolRounds, llmInstructions } from "@/lib/chat/chatConstants";
+import {
+  createCurrentDateContext,
+  createKnownUserContext,
+  type ChatRequestBody,
+} from "@/lib/chat/chatRuntime";
+import {
+  maxToolRounds,
+  receptionistInstructions,
+} from "@/lib/chat/chatConstants";
 import {
   createOpenAIClient,
-  getLatestUserMessage,
   getModel,
   isValidMessage,
 } from "@/lib/chat/chatHelpers";
-import { executeCalendarTool } from "@/lib/tools/calendarToolExecutor";
+import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
+import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 
-type ChatRequestBody = {
-  chatId?: string;
-  messages?: OpenAIChatMessage[];
+const { upsertChatSession, upsertUserProfile } = createSheetClient();
+
+async function persistConversation({
+  bookingStatus,
+  chatId,
+  lastIntent,
+  messages,
+  reply,
+  userId,
+}: {
+  bookingStatus: string;
+  chatId: string;
+  lastIntent: string;
+  messages: OpenAIChatMessage[];
+  reply: string;
   userId?: string;
-};
-
-const { logConversationToSheet } = createSheetClient();
+}) {
+  await upsertChatSession({
+    bookingStatus,
+    chatId,
+    conversation: JSON.stringify([
+      ...messages,
+      {
+        role: "assistant",
+        content: reply,
+      },
+    ]),
+    lastIntent,
+    userId: userId || "",
+  });
+}
 
 export async function POST(request: Request) {
   try {
@@ -31,24 +64,32 @@ export async function POST(request: Request) {
       ? body.messages.filter(isValidMessage)
       : [];
 
-    if (messages.length === 0) {
-      return Response.json(
-        { message: "At least one chat message is required." },
-        { status: 400 },
-      );
-    }
-
     const toolContext = {
       chatId: body.chatId || crypto.randomUUID(),
-      userId: body.userId || undefined,
+      userId: body.userId,
     };
+
+    if (body.userId) {
+      await upsertUserProfile({
+        userId: body.userId,
+        lastChatSessionId: toolContext.chatId,
+        name: body.userProfile?.name,
+        email: body.userProfile?.email,
+        phone: body.userProfile?.phone,
+      });
+    }
+
     const client = createOpenAIClient();
-    const toolsUsed: string[] = [];
+    let bookingStatus = "";
+    let lastIntent = "chat";
+    const knownUserContext = createKnownUserContext(body.userProfile);
     const conversationMemory: ChatCompletionMessageParam[] = [
       {
         role: "system",
-        content: llmInstructions,
+        content: receptionistInstructions,
       },
+      createCurrentDateContext(),
+      ...(knownUserContext ? [knownUserContext] : []),
       ...messages,
     ];
 
@@ -56,7 +97,7 @@ export async function POST(request: Request) {
       const response = await client.chat.completions.create({
         model: getModel(),
         messages: conversationMemory,
-        tools: calendarTools,
+        tools: [...eventLookupTools, ...bookingTools],
         tool_choice: "auto",
       });
       const llmMessage = response.choices[0]?.message;
@@ -73,16 +114,16 @@ export async function POST(request: Request) {
           "I can help with that. Could you share a little more detail?";
 
         try {
-          await logConversationToSheet({
-            assistantReply: reply,
+          await persistConversation({
+            bookingStatus,
             chatId: toolContext.chatId,
-            intent: "chat",
-            toolsUsed,
+            lastIntent,
+            messages,
+            reply,
             userId: toolContext.userId,
-            userMessage: getLatestUserMessage(messages),
           });
         } catch {
-          // TODO: Logging is best-effort so a missing sheet setup does not block chat.
+          // Session logging is best-effort so chat replies still return.
         }
 
         return Response.json({ reply });
@@ -97,11 +138,30 @@ export async function POST(request: Request) {
       conversationMemory.push(llmToolMessage);
 
       for (const toolCall of toolCalls) {
-        if (toolCall.type === "function") {
-          toolsUsed.push(toolCall.function.name);
+        if (toolCall.type !== "function") {
+          continue;
         }
 
-        const result = await executeCalendarTool(toolCall, toolContext);
+        const result =
+          toolCall.function.name === "list_events_in_range"
+            ? await executeEventTool(toolCall)
+            : await executeBookingTool(toolCall, toolContext);
+
+        if (result.intent) {
+          lastIntent = result.intent;
+        }
+
+        if (typeof result.bookingStatus === "string") {
+          bookingStatus = result.bookingStatus;
+        }
+
+        if (toolContext.userId && result.userProfile) {
+          await upsertUserProfile({
+            userId: toolContext.userId,
+            lastChatSessionId: toolContext.chatId,
+            ...result.userProfile,
+          });
+        }
 
         conversationMemory.push({
           role: "tool",
@@ -111,10 +171,23 @@ export async function POST(request: Request) {
       }
     }
 
-    return Response.json({
-      reply:
-        "I need a moment to finish that. Please call the studio so a team member can help.",
-    });
+    const reply =
+      "I need a moment to finish that. Please call the studio so a team member can help.";
+
+    try {
+      await persistConversation({
+        bookingStatus,
+        chatId: toolContext.chatId,
+        lastIntent,
+        messages,
+        reply,
+        userId: toolContext.userId,
+      });
+    } catch {
+      // Session logging is best-effort so chat replies still return.
+    }
+
+    return Response.json({ reply });
   } catch (error) {
     return Response.json(
       {

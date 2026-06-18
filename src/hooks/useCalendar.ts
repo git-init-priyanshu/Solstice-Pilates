@@ -1,12 +1,12 @@
 import { googleApi } from "@/lib/googleApi";
 import { getGoogleAccessToken } from "@/lib/googleAuth";
 import type {
-  CalendarAvailabilityInput,
   CalendarCancelInput,
   CalendarEventResponse,
+  CalendarEventRangeInput,
+  CalendarEventsListResponse,
   CalendarRescheduleInput,
   CalendarScheduleInput,
-  FreeBusyResponse,
 } from "@/types/calendar.types";
 
 const CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3";
@@ -27,45 +27,28 @@ async function requireGoogleAccessToken() {
 }
 
 export function createCalendarClient() {
-  function checkCalendarAvailability({
+  function listCalendarEvents({
     accessToken,
     calendarId,
     timeMin,
     timeMax,
-  }: CalendarAvailabilityInput) {
-    return googleApi<FreeBusyResponse>(`${CALENDAR_API_BASE}/freeBusy`, {
-      accessToken,
-      method: "POST",
-      body: JSON.stringify({
-        timeMin,
-        timeMax,
-        timeZone: defaultTimeZone,
-        items: [{ id: calendarId }],
-      }),
-    }).then((response) => {
-      const calendar = response.calendars[calendarId];
-
-      if (!calendar) {
-        const returnedCalendarIds = Object.keys(response.calendars);
-
-        throw new Error(
-          [
-            `Calendar availability response did not include ${calendarId}`,
-            returnedCalendarIds.length > 0
-              ? `returned calendars: ${returnedCalendarIds.join(", ")}`
-              : "no calendars were returned",
-          ].join("; "),
-        );
-      }
-
-      if (calendar?.errors?.length) {
-        throw new Error(
-          calendar.errors.map((error) => error.reason).join(", "),
-        );
-      }
-
-      return calendar?.busy ?? [];
+  }: CalendarEventRangeInput) {
+    const searchParams = new URLSearchParams({
+      orderBy: "startTime",
+      singleEvents: "true",
+      timeMax,
+      timeMin,
     });
+
+    return googleApi<CalendarEventsListResponse>(
+      `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(
+        calendarId,
+      )}/events?${searchParams.toString()}`,
+      {
+        accessToken,
+        method: "GET",
+      },
+    ).then((response) => response.items ?? []);
   }
 
   function scheduleCalendarEvent({
@@ -147,8 +130,8 @@ export function createCalendarClient() {
 
   return {
     cancelCalendarEvent,
-    checkCalendarAvailability,
     getCalendarId,
+    listCalendarEvents,
     requireGoogleAccessToken,
     rescheduleCalendarEvent,
     scheduleCalendarEvent,

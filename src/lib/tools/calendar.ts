@@ -4,34 +4,9 @@ export const calendarTools: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "check_calendar_availability",
-      description:
-        "Check Solstice Pilates calendar availability before discussing open booking times.",
-      parameters: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          timeMin: {
-            type: "string",
-            description:
-              "Start of the requested window as an RFC3339 date-time with timezone, for example 2026-06-18T10:00:00+05:30.",
-          },
-          timeMax: {
-            type: "string",
-            description:
-              "End of the requested window as an RFC3339 date-time with timezone, for example 2026-06-18T11:00:00+05:30.",
-          },
-        },
-        required: ["timeMin", "timeMax"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "schedule_calendar_event",
       description:
-        "Book a class only after availability was checked and the client explicitly confirmed.",
+        "Book a class after the client explicitly confirmed. This tool checks Calendar conflicts automatically.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -64,7 +39,7 @@ export const calendarTools: ChatCompletionTool[] = [
     function: {
       name: "reschedule_calendar_event",
       description:
-        "Reschedule an existing event only after the client explicitly confirms the new time.",
+        "Reschedule an existing event only after the client explicitly confirms the new time. This tool checks Calendar conflicts automatically.",
       parameters: {
         type: "object",
         additionalProperties: false,

@@ -1,4 +1,4 @@
-export type CalendarAvailabilityInput = {
+export type CalendarEventRangeInput = {
   accessToken: string;
   calendarId: string;
   timeMin: string;
@@ -26,22 +26,23 @@ export type CalendarRescheduleInput = CalendarCancelInput & {
   endDateTime: string;
 };
 
-export type CalendarBusySlot = {
-  start: string;
-  end: string;
+export type CalendarEventTime = {
+  date?: string;
+  dateTime?: string;
+  timeZone?: string;
 };
 
-export type FreeBusyResponse = {
-  calendars: Record<
-    string,
-    {
-      busy?: CalendarBusySlot[];
-      errors?: Array<{
-        domain: string;
-        reason: string;
-      }>;
-    }
-  >;
+export type CalendarListEvent = {
+  end?: CalendarEventTime;
+  htmlLink?: string;
+  id: string;
+  start?: CalendarEventTime;
+  status?: string;
+  summary?: string;
+};
+
+export type CalendarEventsListResponse = {
+  items?: CalendarListEvent[];
 };
 
 export type CalendarEventResponse = {

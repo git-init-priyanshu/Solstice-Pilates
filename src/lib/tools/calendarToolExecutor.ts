@@ -96,7 +96,7 @@ export async function executeCalendarTool(
           customerName,
           customerPhone,
           intent: "booking",
-          toolsUsed: ["schedule_calendar_event", "log_call_to_sheet"],
+          toolsUsed: ["schedule_calendar_event"],
           userId: context.userId,
           userMessage: `${customerName} booking request`,
         });
@@ -155,7 +155,7 @@ export async function executeCalendarTool(
           customerName,
           customerPhone,
           intent: "reschedule",
-          toolsUsed: ["reschedule_calendar_event", "log_call_to_sheet"],
+          toolsUsed: ["reschedule_calendar_event"],
           userId: context.userId,
           userMessage: `${customerName} reschedule request`,
         });
@@ -180,7 +180,7 @@ export async function executeCalendarTool(
           bookingStatus: "cancelled",
           chatId: context.chatId,
           intent: "cancellation",
-          toolsUsed: ["cancel_calendar_event", "log_call_to_sheet"],
+          toolsUsed: ["cancel_calendar_event"],
           userId: context.userId,
           userMessage: `Cancel request for ${eventId}`,
         });

@@ -16,12 +16,6 @@ function getCalendarId() {
   return process.env.GOOGLE_CALENDAR_ID || "primary";
 }
 
-function assertValidDateTime(value: string, name: string) {
-  if (!value || Number.isNaN(Date.parse(value))) {
-    throw new Error(`${name} must be an RFC3339 date-time string`);
-  }
-}
-
 async function requireGoogleAccessToken() {
   const accessToken = await getGoogleAccessToken();
 
@@ -39,9 +33,6 @@ export function createCalendarClient() {
     timeMin,
     timeMax,
   }: CalendarAvailabilityInput) {
-    assertValidDateTime(timeMin, "timeMin");
-    assertValidDateTime(timeMax, "timeMax");
-
     return googleApi<FreeBusyResponse>(`${CALENDAR_API_BASE}/freeBusy`, {
       accessToken,
       method: "POST",

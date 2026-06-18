@@ -63,14 +63,14 @@ export function useSheet() {
       spreadsheetId,
       range,
     });
-    return (valuesResponse.values ?? []).slice(1).map<SheetRecordRow>(
-      (values, index) => ({
+    return (valuesResponse.values ?? [])
+      .slice(1)
+      .map<SheetRecordRow>((values, index) => ({
         rowNumber: index + 2,
         record: Object.fromEntries(
           headers.map((header, i) => [header, values[i] || ""]),
         ),
-      }),
-    );
+      }));
   }
 
   async function findUserById(userId: string) {
@@ -112,6 +112,27 @@ export function useSheet() {
   async function findEventById(eventId: string) {
     const row = (await getRows(eventSheetRange, eventSheetHeaders)).find(
       (candidate) => candidate.record["event_id"] === eventId,
+    );
+    if (!row) return null;
+
+    return {
+      eventId: row.record["event_id"] || "",
+      name: row.record["name"] || "",
+      startTime: row.record["start_time"] || "",
+      endTime: row.record["end_time"] || "",
+      pricingPerHour: parseFloat(row.record["pricing_per_hour"] || "0"),
+      capacity: parseInt(row.record["capacity"] || "0", 10),
+      bookedCustomers: parseInt(row.record["booked_customers"] || "0", 10),
+      createdAt: row.record["created_at"] || "",
+      updatedAt: row.record["updated_at"] || "",
+    };
+  }
+
+  async function findEventByName(eventName: string) {
+    const normalizedEventName = eventName.trim().toLowerCase();
+    const row = (await getRows(eventSheetRange, eventSheetHeaders)).find(
+      (candidate) =>
+        candidate.record["name"].trim().toLowerCase() === normalizedEventName,
     );
     if (!row) return null;
 
@@ -202,7 +223,7 @@ export function useSheet() {
           now,
           now,
         ],
-        ],
+      ],
     });
 
     return {
@@ -300,13 +321,13 @@ export function useSheet() {
     const event = await findEventById(eventId);
 
     if (!event) {
-      throw new Error("The class event could not be found.");
+      throw new Error("The event could not be found.");
     }
 
     const nextBookedCustomers = Number(event.bookedCustomers) + change;
 
     if (nextBookedCustomers > Number(event.capacity)) {
-      throw new Error("This class is already full.");
+      throw new Error("This event is already full.");
     }
 
     return updateEventRecord({
@@ -340,7 +361,7 @@ export function useSheet() {
           now,
           now,
         ],
-        ],
+      ],
     });
 
     return {
@@ -381,7 +402,7 @@ export function useSheet() {
           bookingStatus,
           bookedEventId,
         ],
-        ],
+      ],
     });
 
     return {
@@ -422,7 +443,7 @@ export function useSheet() {
           createdAt: userRow.record["created_at"] || "",
         }
       : null;
-      
+
     const chatId =
       lastChatSessionId || user?.lastChatSessionId || crypto.randomUUID();
     const chat =
@@ -451,9 +472,9 @@ export function useSheet() {
 
     const nextUser = {
       userId,
-      name: name ?? user.name,
-      email: email ?? user.email,
-      phone: phone ?? user.phone,
+      name: name ? name : user.name,
+      email: email ? email : user.email,
+      phone: phone ? phone : user.phone,
       bookingStatus: bookingStatus ?? user.bookingStatus,
       bookedEventId: bookedEventId ?? user.bookedEventId,
       lastChatSessionId: chat.id,
@@ -546,6 +567,7 @@ export function useSheet() {
     adjustEventBookedCustomers,
     createEventRecord,
     findEventById,
+    findEventByName,
     findUserById,
     getUserBookingDetails,
     listEventsInRange,

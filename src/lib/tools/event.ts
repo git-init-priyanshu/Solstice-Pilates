@@ -6,7 +6,7 @@ export const eventLookupTools: ChatCompletionTool[] = [
     function: {
       name: "list_events_in_range",
       description:
-        "Read studio events from the Event sheet before answering class schedule, pricing, or availability questions.",
+        "Read studio events from the Event sheet before answering event schedule, pricing, or availability questions. Use the exact event name from the lookup result when booking or changing an event.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -41,7 +41,7 @@ export const adminEventTools: ChatCompletionTool[] = [
         properties: {
           name: {
             type: "string",
-            description: "Event name, for example Pilates class.",
+            description: "Event name, for example Pilates event.",
           },
           startTime: {
             type: "string",
@@ -59,7 +59,7 @@ export const adminEventTools: ChatCompletionTool[] = [
           },
           capacity: {
             type: "integer",
-            description: "Maximum number of customers who can book this class.",
+            description: "Maximum number of customers who can book this event.",
           },
         },
         required: ["name", "startTime", "endTime", "pricingPerHour", "capacity"],
@@ -78,7 +78,7 @@ export const adminEventTools: ChatCompletionTool[] = [
         properties: {
           eventId: {
             type: "string",
-            description: "Existing Event sheet event_id for the class.",
+            description: "Existing Event sheet event_id for the event.",
           },
           name: {
             type: "string",
@@ -100,7 +100,7 @@ export const adminEventTools: ChatCompletionTool[] = [
           },
           capacity: {
             type: "integer",
-            description: "Updated maximum number of customers who can book this class.",
+            description: "Updated maximum number of customers who can book this event.",
           },
         },
         required: ["eventId"],

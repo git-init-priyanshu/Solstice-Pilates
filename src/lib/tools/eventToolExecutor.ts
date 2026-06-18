@@ -68,7 +68,7 @@ export async function executeEventTool(
 
         const existingEvent = await findEventById(eventId);
         if (!existingEvent) {
-          throw new Error("The selected class event could not be found.");
+          throw new Error("The selected event could not be found.");
         }
 
         const updatedEvent: EventRecord = {
@@ -124,13 +124,28 @@ export async function executeEventTool(
           startTime,
           endTime,
         });
+        const eventOptions = data.map((event) => ({
+          eventId: event.eventId,
+          name: event.name,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          pricingPerHour: event.pricingPerHour,
+          capacity: event.capacity,
+          bookedCustomers: event.bookedCustomers,
+          remainingSpots: Math.max(event.capacity - event.bookedCustomers, 0),
+          availabilityStatus:
+            event.bookedCustomers < event.capacity ? "available" : "full",
+        }));
 
         return {
           ok: true,
           message: "list_events_in_range completed",
           data: {
+            eventOptions,
             events: data,
             count: data.length,
+            selectionRule:
+              "Use the exact event name from one matching event option when booking or changing an event. Do not invent IDs.",
           },
           intent: "event_lookup",
         };
@@ -142,7 +157,7 @@ export async function executeEventTool(
           message: `Unknown event tool: ${toolCall.function.name}`,
         };
     }
-  } catch (error) {
+  } catch {
     return {
       ok: false,
       intent:

@@ -6,14 +6,15 @@ export const bookingTools: ChatCompletionTool[] = [
     function: {
       name: "create_user_booking",
       description:
-        "Store a confirmed class booking in the User sheet after the class event is identified from the Event sheet.",
+        "Store a confirmed event booking in the User sheet after the event is identified from the Event sheet.",
       parameters: {
         type: "object",
         additionalProperties: false,
         properties: {
-          eventId: {
+          eventName: {
             type: "string",
-            description: "Event sheet event_id for the class being booked.",
+            description:
+              "Exact Event sheet event name to book. Use the event name from the lookup result.",
           },
           customerName: { type: "string" },
           customerEmail: { type: "string" },
@@ -25,7 +26,7 @@ export const bookingTools: ChatCompletionTool[] = [
           },
         },
         required: [
-          "eventId",
+          "eventName",
           "customerName",
           "customerEmail",
           "customerPhone",
@@ -39,22 +40,23 @@ export const bookingTools: ChatCompletionTool[] = [
     function: {
       name: "change_user_booking",
       description:
-        "Move the current user's existing class booking to another Event sheet class after the user explicitly confirms the new class.",
+        "Move the current user's existing event booking to another Event sheet event after the user explicitly confirms the new event.",
       parameters: {
         type: "object",
         additionalProperties: false,
         properties: {
-          eventId: {
+          eventName: {
             type: "string",
-            description: "Event sheet event_id for the replacement class.",
+            description:
+              "Exact Event sheet event name to move into. Use the event name from the lookup result.",
           },
           confirmedByCustomer: {
             type: "boolean",
             description:
-              "True only if the user explicitly confirmed the class change.",
+              "True only if the user explicitly confirmed the event change.",
           },
         },
-        required: ["eventId", "confirmedByCustomer"],
+        required: ["eventName", "confirmedByCustomer"],
       },
     },
   },
@@ -74,9 +76,9 @@ export const bookingTools: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "find_alternative_class_options",
+      name: "find_alternative_event_options",
       description:
-        "For a user with an existing booking, find alternative class times in a requested window, excluding the current booking and checking seat availability.",
+        "For a user with an existing booking, find alternative event times in a requested window, excluding the current booking and checking seat availability.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -91,10 +93,10 @@ export const bookingTools: ChatCompletionTool[] = [
             description:
               "End of the search window as an RFC3339 date-time with timezone.",
           },
-          className: {
+          eventName: {
             type: "string",
             description:
-              "Optional class name filter. If omitted, use the currently booked class name.",
+              "Optional event name filter. If omitted, use the currently booked event name.",
           },
         },
         required: ["startTime", "endTime"],
@@ -106,7 +108,7 @@ export const bookingTools: ChatCompletionTool[] = [
     function: {
       name: "check_booking_guest_capacity",
       description:
-        "Check whether the user's currently booked class has enough remaining capacity for one or more additional guests.",
+        "Check whether the user's currently booked event has enough remaining capacity for one or more additional guests.",
       parameters: {
         type: "object",
         additionalProperties: false,

@@ -6,11 +6,32 @@ import type { ToolResult, WorkspaceToolContext } from "@/types/tools.types";
 const {
   adjustEventBookedCustomers,
   findEventById,
+  findEventByName,
   listEventsInRange,
   findUserById,
   getUserBookingDetails,
   upsertUserProfile,
 } = useSheet();
+
+function resolveEventName(args: Record<string, unknown>) {
+  const eventName = args["eventName"];
+
+  if (typeof eventName !== "string") {
+    return "";
+  }
+
+  return eventName.trim();
+}
+
+async function resolveEventByName(args: Record<string, unknown>) {
+  const eventName = resolveEventName(args);
+
+  if (!eventName) {
+    return null;
+  }
+
+  return findEventByName(eventName);
+}
 
 export async function executeBookingTool(
   toolCall: ChatCompletionMessageFunctionToolCall,
@@ -29,30 +50,38 @@ export async function executeBookingTool(
         const customerName = args["customerName"];
         const customerEmail = args["customerEmail"];
         const customerPhone = args["customerPhone"];
-        const eventId = args["eventId"];
+        const event = await resolveEventByName(args);
         const confirmedByCustomer = args["confirmedByCustomer"] === true;
         if (!confirmedByCustomer) {
           throw new Error("Customer must explicitly confirm before booking.");
         }
 
-        const event = await findEventById(eventId);
         if (!event) {
-          throw new Error("The selected class event could not be found.");
-        }
-        const existingUser = await findUserById(userId);
-        if (
-          existingUser?.bookingStatus === "booked" &&
-          existingUser.bookedEventId === event.eventId
-        ) {
-          throw new Error("The user is already booked into that class.");
-        }
-        if (event.bookedCustomers >= event.capacity) {
-          throw new Error("This class is already full.");
+          throw new Error(
+            "An event name is required. Use the Event sheet lookup result and pass eventName.",
+          );
         }
 
+        const existingUser = await findUserById(userId);
+        const isSameEvent =
+          existingUser?.bookingStatus === "booked" &&
+          existingUser.bookedEventId === event.eventId;
+        const isGuestBooking =
+          isSameEvent &&
+          (existingUser?.name !== customerName ||
+            existingUser?.email !== customerEmail ||
+            existingUser?.phone !== customerPhone);
+        if (isSameEvent && !isGuestBooking) {
+          throw new Error("The user is already booked into that event.");
+        }
+        if (event.bookedCustomers >= event.capacity) {
+          throw new Error("This event is already full.");
+        }
+
+        const bookingUserId = isGuestBooking ? crypto.randomUUID() : userId;
         const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
         const session = await upsertUserProfile({
-          userId,
+          userId: bookingUserId,
           bookedEventId: event.eventId,
           bookingStatus: "booked",
           lastChatSessionId: toolContext.chatId,
@@ -71,27 +100,32 @@ export async function executeBookingTool(
             user: session.user,
           },
           intent: "booking",
-          userProfile: {
-            email: customerEmail,
-            name: customerName,
-            phone: customerPhone,
-          },
+          ...(isGuestBooking
+            ? {}
+            : {
+                userProfile: {
+                  email: customerEmail,
+                  name: customerName,
+                  phone: customerPhone,
+                },
+              }),
         };
       }
 
       case "change_user_booking": {
-        const eventId = args["eventId"];
+        const event = await resolveEventByName(args);
         const confirmedByCustomer = args["confirmedByCustomer"] === true;
 
         if (!confirmedByCustomer) {
           throw new Error(
-            "Customer must explicitly confirm before changing classes.",
+            "Customer must explicitly confirm before changing events.",
           );
         }
 
-        const selectedEvent = await findEventById(eventId);
-        if (!selectedEvent) {
-          throw new Error("The selected class event could not be found.");
+        if (!event) {
+          throw new Error(
+            "An event name is required. Use the Event sheet lookup result and pass eventName.",
+          );
         }
 
         const existingUser = await findUserById(userId);
@@ -101,27 +135,24 @@ export async function executeBookingTool(
             : "";
         if (!previousBookedEventId) {
           throw new Error(
-            "The user does not have a current class booking to change.",
+            "The user does not have a current event booking to change.",
           );
         }
-        if (previousBookedEventId === selectedEvent.eventId) {
-          throw new Error("The user is already booked into that class.");
+        if (previousBookedEventId === event.eventId) {
+          throw new Error("The user is already booked into that event.");
         }
-        if (selectedEvent.bookedCustomers >= selectedEvent.capacity) {
-          throw new Error("This class is already full.");
+        if (event.bookedCustomers >= event.capacity) {
+          throw new Error("This event is already full.");
         }
 
         const previousEvent = await findEventById(previousBookedEventId);
 
         await adjustEventBookedCustomers(previousBookedEventId, -1);
-        const updatedEvent = await adjustEventBookedCustomers(
-          selectedEvent.eventId,
-          1,
-        );
+        const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
 
         const session = await upsertUserProfile({
           userId,
-          bookedEventId: selectedEvent.eventId,
+          bookedEventId: event.eventId,
           bookingStatus: "booked",
           lastChatSessionId: toolContext.chatId,
         });
@@ -161,24 +192,21 @@ export async function executeBookingTool(
         };
       }
 
-      case "find_alternative_class_options": {
+      case "find_alternative_event_options": {
         const startTime = args["startTime"];
         const endTime = args["endTime"];
-        const className = args["className"];
+        const eventName = args["eventName"];
         const booking = await getUserBookingDetails(userId);
 
         if (!booking?.event) {
           throw new Error(
-            "The user does not have a current class booking to change.",
+            "The user does not have a current event booking to change.",
           );
         }
 
-        const alternatives = (await listEventsInRange({ startTime, endTime }))
-          .filter(
-            (event) =>
-              event.eventId !== booking.event?.eventId &&
-              event.name === className,
-          )
+        const allEvents = await listEventsInRange({ startTime, endTime });
+        const alternatives = allEvents
+          .filter((event) => event.eventId !== booking.event?.eventId)
           .map((event) => ({
             ...event,
             availabilityStatus:
@@ -188,13 +216,13 @@ export async function executeBookingTool(
 
         return {
           ok: true,
-          message: "find_alternative_class_options completed",
+          message: "find_alternative_event_options completed",
           data: {
             alternatives,
             availableAlternatives: alternatives.filter(
               (event) => event.bookedCustomers < event.capacity,
             ),
-            targetClassName: className,
+            targetEventName: eventName,
           },
           intent: "booking_change_lookup",
         };
@@ -205,7 +233,7 @@ export async function executeBookingTool(
         const booking = await getUserBookingDetails(userId);
 
         if (!booking?.event) {
-          throw new Error("The user does not have a current class booking.");
+          throw new Error("The user does not have a current event booking.");
         }
 
         const remainingSpots = Math.max(
@@ -232,7 +260,7 @@ export async function executeBookingTool(
           message: `Unknown booking tool: ${toolCall.function.name}`,
         };
     }
-  } catch (error) {
+  } catch {
     return {
       ok: false,
       intent:
@@ -242,7 +270,7 @@ export async function executeBookingTool(
             ? "booking_change"
             : toolCall.function.name === "get_user_booking_status"
               ? "booking_status"
-              : toolCall.function.name === "find_alternative_class_options"
+              : toolCall.function.name === "find_alternative_event_options"
                 ? "booking_change_lookup"
                 : toolCall.function.name === "check_booking_guest_capacity"
                   ? "booking_guest_capacity"

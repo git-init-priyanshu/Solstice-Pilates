@@ -1,6 +1,3 @@
-import type { EventRecord } from "@/types/event.types";
-import type { ChatSessionRecord, UserProfile } from "@/types/session.types";
-
 export type SheetReadInput = {
   accessToken: string;
   spreadsheetId: string;
@@ -52,6 +49,7 @@ export type UserProfileInput = {
   name?: string;
   email?: string;
   phone?: string;
+  role?: "admin" | "user";
 };
 
 export type ChatSessionInput = {

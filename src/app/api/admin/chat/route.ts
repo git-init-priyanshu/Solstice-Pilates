@@ -1,6 +1,6 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-import { useSheet } from "@/hooks/useSheet";
+import { createSheetApi } from "@/hooks/useSheet";
 import { adminInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
 import {
   createCurrentDateContext,
@@ -10,7 +10,7 @@ import { adminEventTools } from "@/lib/tools/event";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 import type { ChatRequestBody } from "@/types/chat.types";
 
-const { upsertChatSession, upsertUserProfile } = useSheet();
+const { upsertChatSession, upsertUserProfile } = createSheetApi();
 
 export async function POST(request: Request) {
   try {
@@ -33,8 +33,9 @@ export async function POST(request: Request) {
 
     if (toolContext.userId) {
       await upsertUserProfile({
-        userId: toolContext.userId,
         lastChatSessionId: toolContext.chatId,
+        role: "admin",
+        userId: toolContext.userId,
       });
     }
 
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
       },
       { status: 500 },
     );
-  } catch (error) {
+  } catch {
     return Response.json(
       {
         message: "The admin assistant could not reply.",

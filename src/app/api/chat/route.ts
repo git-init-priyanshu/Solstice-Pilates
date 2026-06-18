@@ -2,7 +2,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 
 import { bookingTools } from "@/lib/tools/booking";
 import { eventLookupTools } from "@/lib/tools/event";
-import { useSheet } from "@/hooks/useSheet";
+import { createSheetApi } from "@/hooks/useSheet";
 import type { ChatRequestBody } from "@/types/chat.types";
 
 import { maxToolRounds, assistantInstructions } from "@/lib/chat/chatConstants";
@@ -14,12 +14,12 @@ import {
 import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 
-const { upsertChatSession, upsertUserProfile } = useSheet();
+const { upsertChatSession, upsertUserProfile } = createSheetApi();
 
 export async function POST(request: Request) {
   try {
     const body: ChatRequestBody = await request.json();
-    const messages = body.messages?.filter(
+    const clientMessages = body.messages?.filter(
       (message) => message.role === "user" || message.role === "assistant",
     ) ?? [];
 
@@ -28,14 +28,53 @@ export async function POST(request: Request) {
       userId: body.userId,
     };
 
-    if (body.userId) {
-      await upsertUserProfile({
+    const session = body.userId
+      ? await upsertUserProfile({
         userId: body.userId,
         lastChatSessionId: toolContext.chatId,
         name: body.userProfile?.name,
         email: body.userProfile?.email,
         phone: body.userProfile?.phone,
+        role: "user",
+      })
+      : null;
+
+    const messages = clientMessages;
+
+    const latestUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === "user");
+    const isExistingHandoff = session?.chat.lastIntent === "human_handoff";
+    const shouldHandoff =
+      isExistingHandoff ||
+      /(refund|billing|charged|charge|wrong price|price issue|price complaint|complaint|complain|manager|human|admin|birthday|party|private event|celebration)/.test(
+        latestUserMessage?.content.toLowerCase() || "",
+      );
+
+    if (shouldHandoff) {
+      const reply = isExistingHandoff
+        ? null
+        : "I've shared this with the studio admin. They will reply here soon.";
+
+      await upsertChatSession({
+        bookingStatus: session?.chat.bookingStatus ?? "",
+        chatId: toolContext.chatId,
+        conversation: JSON.stringify(
+          reply
+            ? [
+                ...messages,
+                {
+                  role: "assistant",
+                  content: reply,
+                },
+              ]
+            : messages,
+        ),
+        lastIntent: "human_handoff",
+        userId: toolContext.userId || "",
       });
+
+      return Response.json({ reply });
     }
 
     const openAiClient = createOpenAIClient();
@@ -131,7 +170,7 @@ export async function POST(request: Request) {
       },
       { status: 500 },
     );
-  } catch (error) {
+  } catch {
     return Response.json(
       {
         message: "The assistant could not reply.",

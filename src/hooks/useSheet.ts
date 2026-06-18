@@ -18,7 +18,7 @@ import type {
 } from "@/types/sheet.types";
 
 const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || "";
-const userSheetRange = "User!A:H";
+const userSheetRange = "User!A:I";
 const chatSheetRange = "Chat!A:H";
 const eventSheetRange = "Event!A:I";
 
@@ -31,6 +31,7 @@ const userSheetHeaders = [
   "created_at",
   "booking_status",
   "booked_event_id",
+  "role",
 ] as const;
 
 const chatSheetHeaders = [
@@ -56,7 +57,7 @@ const eventSheetHeaders = [
   "updated_at",
 ] as const;
 
-export function useSheet() {
+export function createSheetApi() {
   async function getRows(range: string, headers: readonly string[]) {
     const valuesResponse = await getSheetValues({
       accessToken: await getGoogleAccessToken(),
@@ -88,6 +89,7 @@ export function useSheet() {
       bookedEventId: row.record["booked_event_id"] || "",
       lastChatSessionId: row.record["last_chat_session_id"] || "",
       createdAt: row.record["created_at"] || "",
+      role: row.record["role"] === "admin" ? "admin" : "user",
     };
   }
 
@@ -184,6 +186,67 @@ export function useSheet() {
       .sort(
         (left, right) =>
           Date.parse(left.startTime) - Date.parse(right.startTime),
+      );
+  }
+
+  async function listHandoffChats() {
+    const [userRows, chatRows] = await Promise.all([
+      getRows(userSheetRange, userSheetHeaders),
+      getRows(chatSheetRange, chatSheetHeaders),
+    ]);
+
+    return userRows
+      .map((userRow) => {
+        const user = {
+          userId: userRow.record["user_id"] || "",
+          name: userRow.record["name"] || "",
+          email: userRow.record["email"] || "",
+          phone: userRow.record["phone"] || "",
+          bookingStatus: userRow.record["booking_status"] || "",
+          bookedEventId: userRow.record["booked_event_id"] || "",
+          lastChatSessionId: userRow.record["last_chat_session_id"] || "",
+          createdAt: userRow.record["created_at"] || "",
+          role: userRow.record["role"] === "admin" ? "admin" : "user",
+        };
+        const chatRow = chatRows.find(
+          (candidate) => candidate.record["id"] === user.lastChatSessionId,
+        );
+        const conversation = chatRow?.record["conversation"] || "";
+        const messages = conversation
+          ? (JSON.parse(conversation) as Array<{
+              content: string;
+              role: "assistant" | "user";
+            }>)
+          : [];
+
+        if (
+          user.role !== "user" ||
+          !chatRow ||
+          chatRow.record["user_id"] !== user.userId ||
+          (chatRow.record["last_intent"] || "") !== "human_handoff" ||
+          !messages.some((message) => message.role === "user" && message.content)
+        ) {
+          return null;
+        }
+
+        return {
+          chat: {
+            id: chatRow.record["id"] || "",
+            userId: chatRow.record["user_id"] || "",
+            conversation,
+            conversationSummary: chatRow.record["conversation_summary"] || "",
+            lastIntent: chatRow.record["last_intent"] || "",
+            bookingStatus: chatRow.record["booking_status"] || "",
+            createdAt: chatRow.record["created_at"] || "",
+            updatedAt: chatRow.record["updated_at"] || "",
+          },
+          user,
+        };
+      })
+      .filter( item=> item !== null)
+      .sort(
+        (left, right) =>
+          Date.parse(right.chat.updatedAt) - Date.parse(left.chat.updatedAt),
       );
   }
 
@@ -384,6 +447,7 @@ export function useSheet() {
     name = "",
     email = "",
     phone = "",
+    role = "user",
   }: UserProfileInput): Promise<UserProfile> {
     const createdAt = new Date().toISOString();
 
@@ -401,6 +465,7 @@ export function useSheet() {
           createdAt,
           bookingStatus,
           bookedEventId,
+          role,
         ],
       ],
     });
@@ -414,6 +479,7 @@ export function useSheet() {
       bookedEventId,
       lastChatSessionId: lastChatSessionId || "",
       createdAt,
+      role,
     };
   }
 
@@ -425,6 +491,7 @@ export function useSheet() {
     name,
     email,
     phone,
+    role,
   }: UserProfileInput) {
     const userRow = (await getRows(userSheetRange, userSheetHeaders)).find(
       (candidate) => candidate.record["user_id"] === userId,
@@ -441,6 +508,7 @@ export function useSheet() {
           bookedEventId: userRow.record["booked_event_id"] || "",
           lastChatSessionId: userRow.record["last_chat_session_id"] || "",
           createdAt: userRow.record["created_at"] || "",
+          role: userRow.record["role"] === "admin" ? "admin" : "user",
         }
       : null;
 
@@ -462,6 +530,7 @@ export function useSheet() {
         phone,
         bookingStatus,
         bookedEventId,
+        role,
       });
 
       return {
@@ -479,12 +548,13 @@ export function useSheet() {
       bookedEventId: bookedEventId ?? user.bookedEventId,
       lastChatSessionId: chat.id,
       createdAt: user.createdAt,
+      role: role ?? user.role,
     };
 
     await updateSheetValues({
       accessToken: await getGoogleAccessToken(),
       spreadsheetId,
-      range: `User!A${user.rowNumber}:H${user.rowNumber}`,
+      range: `User!A${user.rowNumber}:I${user.rowNumber}`,
       values: [
         [
           nextUser.userId,
@@ -495,6 +565,7 @@ export function useSheet() {
           nextUser.createdAt,
           nextUser.bookingStatus,
           nextUser.bookedEventId,
+          nextUser.role,
         ],
       ],
     });
@@ -568,8 +639,10 @@ export function useSheet() {
     createEventRecord,
     findEventById,
     findEventByName,
+    findChatById,
     findUserById,
     getUserBookingDetails,
+    listHandoffChats,
     listEventsInRange,
     updateEventRecord,
     upsertChatSession,

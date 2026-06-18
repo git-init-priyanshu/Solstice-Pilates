@@ -9,6 +9,7 @@ export type UserProfile = {
   bookedEventId: string;
   lastChatSessionId: string;
   createdAt: string;
+  role: "admin" | "user";
 };
 
 export type ChatSessionRecord = {

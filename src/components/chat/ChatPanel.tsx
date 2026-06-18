@@ -11,6 +11,7 @@ import type { ChatPanelProps } from "@/types/chat.types";
 export function ChatPanel({
   apiPath = "/api/chat",
   placeholder = "Ask about classes, booking, pricing, or call the studio",
+  role = "user",
   sessionApiPath = "/api/chat/session",
   subtitle = "AI assistant",
   title = "Solstice Pilates",
@@ -26,6 +27,7 @@ export function ChatPanel({
     submitChatMessage,
   } = useChat({
     apiPath,
+    role,
     sessionApiPath,
     userIdStorageKey,
   });

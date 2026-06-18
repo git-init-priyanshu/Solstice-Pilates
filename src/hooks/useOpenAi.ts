@@ -22,10 +22,7 @@ export function useOpenAi() {
       throw new Error(payload.message || "Unable to reach the assistant.");
     }
 
-    return (
-      payload.reply ||
-      "I can help with that. Could you share a little more detail?"
-    );
+    return payload.reply ?? null;
   }
 
   return {

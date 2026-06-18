@@ -1,18 +1,19 @@
-import { useSheet } from "@/hooks/useSheet";
+import { createSheetApi } from "@/hooks/useSheet";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 
-const { upsertUserProfile } = useSheet();
+const { upsertUserProfile } = createSheetApi();
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
+    const role = searchParams.get("role") === "admin" ? "admin" : "user";
 
     if (!userId) {
       return Response.json({ message: "userId is required." }, { status: 400 });
     }
 
-    const { chat, user } = await upsertUserProfile({ userId });
+    const { chat, user } = await upsertUserProfile({ role, userId });
 
     return Response.json({
       user,

@@ -17,6 +17,7 @@ function getCurrentTime() {
 
 export function useChat({
   apiPath,
+  role = "user",
   sessionApiPath,
   userIdStorageKey,
 }: UseChatOptions) {
@@ -54,7 +55,7 @@ export function useChat({
 
       try {
         const response = await fetch(
-          `${sessionApiPath}?userId=${existingUserId}`,
+          `${sessionApiPath}?userId=${existingUserId}&role=${role}`,
         );
         const payload = await response.json();
 
@@ -85,7 +86,7 @@ export function useChat({
     }
 
     loadSession();
-  }, [sessionApiPath, storageKey]);
+  }, [role, sessionApiPath, storageKey]);
 
   async function submitChatMessage() {
     const trimmedInput = chatInput.trim();
@@ -119,15 +120,17 @@ export function useChat({
         userProfile: profile,
       });
 
-      setMessages((currentMessages) => [
-        ...currentMessages,
-        {
-          id: crypto.randomUUID(),
-          sender: "LLM",
-          text: reply,
-          time: getCurrentTime(),
-        },
-      ]);
+      if (reply) {
+        setMessages((currentMessages) => [
+          ...currentMessages,
+          {
+            id: crypto.randomUUID(),
+            sender: "LLM",
+            text: reply,
+            time: getCurrentTime(),
+          },
+        ]);
+      }
     } catch {
       setMessages((currentMessages) => [
         ...currentMessages,

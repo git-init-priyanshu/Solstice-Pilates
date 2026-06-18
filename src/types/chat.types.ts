@@ -17,6 +17,7 @@ export type ChatRequestBody = {
 
 export type UseChatOptions = {
   apiPath: string;
+  role?: "admin" | "user";
   sessionApiPath?: string;
   userIdStorageKey?: string;
 };
@@ -24,6 +25,7 @@ export type UseChatOptions = {
 export type ChatPanelProps = {
   apiPath?: string;
   placeholder?: string;
+  role?: "admin" | "user";
   sessionApiPath?: string;
   subtitle?: string;
   title?: string;

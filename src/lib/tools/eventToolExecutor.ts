@@ -136,13 +136,21 @@ export async function executeEventTool(
           availabilityStatus:
             event.bookedCustomers < event.capacity ? "available" : "full",
         }));
+        const summary = eventOptions.length
+          ? `Found ${eventOptions.length} event${eventOptions.length === 1 ? "" : "s"}: ${eventOptions
+              .map(
+                (event) =>
+                  `${event.name}, ${event.startTime} to ${event.endTime}, ${event.availabilityStatus}, ${event.remainingSpots} spots remaining, price ${event.pricingPerHour}`,
+              )
+              .join("; ")}.`
+          : `No events found between ${startTime} and ${endTime}.`;
 
         return {
           ok: true,
           message: "list_events_in_range completed",
           data: {
+            summary,
             eventOptions,
-            events: data,
             count: data.length,
             selectionRule:
               "Use the exact event name from one matching event option when booking or changing an event. Do not invent IDs.",

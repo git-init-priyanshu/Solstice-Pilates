@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { assistantInstructions } from "@/lib/chat/chatConstants";
+import { createCurrentDateContext } from "@/lib/chat/chatHelpers";
 import { bookingTools } from "@/lib/tools/booking";
 import { eventLookupTools } from "@/lib/tools/event";
 import type {
@@ -137,11 +138,14 @@ export function useVapiCall({
           userId,
         },
         model: {
+          provider: "openai",
+          model: "gpt-4.1",
           messages: [
             {
               role: "system",
               content: assistantInstructions,
             },
+            createCurrentDateContext(),
           ],
           tools: voiceToolDefinitions,
         },

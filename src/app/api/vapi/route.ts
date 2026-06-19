@@ -45,90 +45,113 @@ export async function POST(request: Request) {
     // Execute tools
     if (message.type === "tool-calls") {
       const results = await Promise.all(
-        (message.toolCallList ?? []).map(async (toolCall, index) => {
-          const toolCallId = toolCall.id ? toolCall.id : `tool-call-${index}`;
-          const toolName = String(
-            toolCall.function?.name || toolCall.name || "",
-          );
+        (message.toolCallList ?? []).map(async (toolCall) => {
+          const toolCallId = toolCall.id || "";
 
-          if (!toolName) {
-            return {
-              error: "Tool call payload was invalid.",
-              name: "unknown",
-              toolCallId,
-            };
-          }
+          try {
+            const toolName = String(
+              toolCall.function?.name || toolCall.name || "",
+            );
 
-          let parameters: Record<string, unknown> = {};
+            if (!toolCallId || !toolName) {
+              return {
+                result: "Tool call payload was invalid.",
+                toolCallId,
+              };
+            }
 
-          if (toolCall.parameters) {
-            parameters = toolCall.parameters;
-          } else if (typeof toolCall.function?.arguments === "string") {
-            parameters = JSON.parse(toolCall.function.arguments);
-          } else if (toolCall.function?.arguments) {
-            parameters = toolCall.function.arguments;
-          }
+            let parameters: Record<string, unknown> = {};
 
-          const assistantToolCall = {
-            id: toolCallId,
-            type: "function" as const,
-            function: {
-              arguments: JSON.stringify(parameters),
-              name: toolName,
-            },
-          };
-          let result;
+            if (toolCall.parameters) {
+              parameters = toolCall.parameters;
+            } else if (typeof toolCall.arguments === "string") {
+              parameters = JSON.parse(toolCall.arguments);
+            } else if (toolCall.arguments) {
+              parameters = toolCall.arguments;
+            } else if (typeof toolCall.function?.arguments === "string") {
+              parameters = JSON.parse(toolCall.function.arguments);
+            } else if (toolCall.function?.arguments) {
+              parameters = toolCall.function.arguments;
+            }
 
-          if (toolName === "list_events_in_range") {
-            result = await executeEventTool(assistantToolCall);
-          } else if (toolName === "request_human_handoff") {
-            result = {
-              ok: true,
-              message: "request_human_handoff completed",
-              data: {
-                reason:
-                  typeof parameters.reason === "string" ? parameters.reason : "",
+            const assistantToolCall = {
+              id: toolCallId,
+              type: "function" as const,
+              function: {
+                arguments: JSON.stringify(parameters),
+                name: toolName,
               },
-              intent: "human_handoff",
             };
-          } else {
-            result = await executeBookingTool(assistantToolCall, {
-              chatId,
-              userId,
-            });
-          }
 
-          if (userId && result.userProfile) {
-            await upsertUserProfile({
-              userId,
-              lastChatSessionId: chatId,
-              ...result.userProfile,
-            });
-          }
-          await upsertChatSession({
-            bookingStatus: result.bookingStatus,
-            chatId,
-            lastIntent: result.intent,
-            userId,
-          });
+            const result =
+              toolName === "list_events_in_range"
+                ? await executeEventTool(assistantToolCall)
+                : toolName === "request_human_handoff"
+                  ? {
+                      ok: true,
+                      message: "request_human_handoff completed",
+                      data: {
+                        reason:
+                          typeof parameters.reason === "string"
+                            ? parameters.reason
+                            : "",
+                      },
+                      intent: "human_handoff",
+                    }
+                  : await executeBookingTool(assistantToolCall, {
+                      chatId,
+                      userId,
+                    });
 
-          if (!result.ok) {
+            if (!result.ok) {
+              return {
+                result: result.message.replace(/\s+/g, " ").trim(),
+                toolCallId,
+              };
+            }
+
+            const summary =
+              typeof result.data === "object" &&
+              result.data &&
+              "summary" in result.data &&
+              typeof result.data.summary === "string"
+                ? result.data.summary
+                : result.message;
+
+            try {
+              if (userId && result.userProfile) {
+                await upsertUserProfile({
+                  userId,
+                  lastChatSessionId: chatId,
+                  ...result.userProfile,
+                });
+              }
+              await upsertChatSession({
+                bookingStatus: result.bookingStatus,
+                chatId,
+                lastIntent: result.intent,
+                userId,
+              });
+            } catch (error) {
+              console.error("Unable to persist Vapi tool result.", error);
+            }
+
             return {
-              error: result.message,
-              name: toolName,
+              result: (summary || result.message).replace(/\s+/g, " ").trim(),
+              toolCallId,
+            };
+          } catch (error) {
+            console.error("Unable to execute Vapi tool call.", error);
+
+            return {
+              result: "Tool execution failed.",
               toolCallId,
             };
           }
-
-          return {
-            name: toolName,
-            result: JSON.stringify(result),
-            toolCallId,
-          };
         }),
       );
 
-      return Response.json({ results });
+      return Response.json({ results }, { status: 200 });
     }
 
     // Persist the latest voice conversation snapshot and final transcript in Sheets.

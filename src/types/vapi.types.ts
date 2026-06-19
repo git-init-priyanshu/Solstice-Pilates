@@ -18,21 +18,18 @@ export type VapiToolDefinition = {
 
 export type VapiAssistantOverrides = {
   firstMessage?: string;
-  firstMessageMode?:
-    | "assistant-speaks-first"
-    | "assistant-speaks-first-with-model-generated-message"
-    | "assistant-waits-for-user";
+  firstMessageMode?: string;
   metadata?: Record<string, string>;
   model?: {
+    model?: string;
     messages?: Array<{
       content: string | null;
       role: "assistant" | "function" | "system" | "tool" | "user";
     }>;
+    provider?: string;
     tools?: VapiToolDefinition[];
   };
-  serverMessages?: Array<
-    "assistant.started" | "conversation-update" | "end-of-call-report" | "tool-calls"
-  >;
+  serverMessages?: string[];
   variableValues?: Record<string, string>;
 };
 
@@ -48,6 +45,7 @@ export type VapiConversationMessage = {
 };
 
 export type VapiToolCall = {
+  arguments?: Record<string, unknown> | string;
   function?: {
     arguments?: Record<string, unknown> | string;
     name?: string;
@@ -84,6 +82,7 @@ export type VapiRouteMessageEntry = {
 };
 
 export type VapiRouteToolCall = {
+  arguments?: Record<string, unknown> | string;
   function?: {
     arguments?: Record<string, unknown> | string;
     name?: string;

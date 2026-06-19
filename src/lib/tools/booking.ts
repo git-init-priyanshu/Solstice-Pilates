@@ -63,6 +63,25 @@ export const bookingTools: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "request_human_handoff",
+      description:
+        "Escalate the conversation to a human studio admin for billing complaints, refunds, safety concerns, private events, or when the client explicitly asks for a person.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          reason: {
+            type: "string",
+            description: "Short reason for the handoff.",
+          },
+        },
+        required: ["reason"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_user_booking_status",
       description:
         "Fetch the current user's booking status from the User and Event sheets.",

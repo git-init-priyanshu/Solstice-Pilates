@@ -1,168 +1,10 @@
-import {
-  executeUserAssistantTool,
-  persistUserConversation,
-} from "@/lib/chat/userAssistant";
+import { useSheet as sheetApi } from "@/hooks/useSheet";
+import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
+import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 import type { OpenAIChatMessage } from "@/types/openai.types";
-import type {
-  VapiToolCall,
-  VapiWebhookMessage,
-  VapiWebhookPayload,
-} from "@/types/vapi.types";
+import type { VapiRoutePayload } from "@/types/vapi.types";
 
-function getVariableValues(message: VapiWebhookMessage) {
-  return message.artifact?.variableValues ?? {};
-}
-
-function getStringValue(
-  values: Record<string, unknown>,
-  key: "chatId" | "email" | "name" | "phone" | "userId",
-) {
-  const value = values[key];
-
-  return typeof value === "string" ? value : "";
-}
-
-function getChatId(message: VapiWebhookMessage) {
-  const chatId = getStringValue(getVariableValues(message), "chatId");
-
-  return chatId || message.call?.id || crypto.randomUUID();
-}
-
-function normalizeConversation(
-  messages: VapiWebhookMessage["messagesOpenAIFormatted"],
-): OpenAIChatMessage[] {
-  return (messages ?? []).flatMap((message) => {
-    if (
-      (message.role !== "user" && message.role !== "assistant") ||
-      typeof message.content !== "string"
-    ) {
-      return [];
-    }
-
-    return [
-      {
-        role: message.role,
-        content: message.content,
-      },
-    ];
-  });
-}
-
-function normalizeToolCall(toolCall: VapiToolCall, index: number) {
-  const toolCallId =
-    typeof toolCall.id === "string" && toolCall.id
-      ? toolCall.id
-      : `tool-call-${index}`;
-  const toolName =
-    typeof toolCall.name === "string" && toolCall.name
-      ? toolCall.name
-      : typeof toolCall.function?.name === "string"
-        ? toolCall.function.name
-        : "";
-
-  if (!toolName) {
-    return null;
-  }
-
-  if (toolCall.parameters && typeof toolCall.parameters === "object") {
-    return {
-      parameters: toolCall.parameters,
-      toolCallId,
-      toolName,
-    };
-  }
-
-  if (toolCall.function?.arguments && typeof toolCall.function.arguments === "object") {
-    return {
-      parameters: toolCall.function.arguments,
-      toolCallId,
-      toolName,
-    };
-  }
-
-  if (typeof toolCall.function?.arguments === "string") {
-    try {
-      return {
-        parameters: JSON.parse(toolCall.function.arguments) as Record<
-          string,
-          unknown
-        >,
-        toolCallId,
-        toolName,
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  return {
-    parameters: {},
-    toolCallId,
-    toolName,
-  };
-}
-
-async function handleToolCalls(message: VapiWebhookMessage) {
-  const values = getVariableValues(message);
-  const chatId = getChatId(message);
-  const userId = getStringValue(values, "userId");
-  const results = await Promise.all(
-    (message.toolCallList ?? []).map(async (toolCall, index) => {
-      const normalizedToolCall = normalizeToolCall(toolCall, index);
-
-      if (!normalizedToolCall) {
-        return {
-          error: "Tool call payload was invalid.",
-          name: "unknown",
-          toolCallId:
-            typeof toolCall.id === "string" && toolCall.id
-              ? toolCall.id
-              : `tool-call-${index}`,
-        };
-      }
-
-      const result = await executeUserAssistantTool({
-        chatId,
-        parameters: normalizedToolCall.parameters,
-        toolCallId: normalizedToolCall.toolCallId,
-        toolName: normalizedToolCall.toolName,
-        userId,
-      });
-
-      return result.ok
-        ? {
-            name: normalizedToolCall.toolName,
-            result: JSON.stringify(result),
-            toolCallId: normalizedToolCall.toolCallId,
-          }
-        : {
-            error: result.message,
-            name: normalizedToolCall.toolName,
-            toolCallId: normalizedToolCall.toolCallId,
-          };
-    }),
-  );
-
-  return Response.json({ results });
-}
-
-async function handleConversationUpdate(message: VapiWebhookMessage) {
-  const values = getVariableValues(message);
-
-  await persistUserConversation({
-    chatId: getChatId(message),
-    conversationSummary: message.artifact?.transcript,
-    messages: normalizeConversation(
-      message.messagesOpenAIFormatted ?? message.artifact?.messagesOpenAIFormatted,
-    ),
-    userId: getStringValue(values, "userId"),
-    userProfile: {
-      email: getStringValue(values, "email"),
-      name: getStringValue(values, "name"),
-      phone: getStringValue(values, "phone"),
-    },
-  });
-}
+const { upsertChatSession, upsertUserProfile } = sheetApi();
 
 export async function POST(request: Request) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
@@ -178,7 +20,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = (await request.json()) as VapiWebhookPayload;
+    const payload = (await request.json()) as VapiRoutePayload;
     const message = payload.message;
 
     if (!message?.type) {
@@ -190,15 +32,139 @@ export async function POST(request: Request) {
       );
     }
 
+    const variableValues = (message.artifact?.variableValues ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const chatId = String(variableValues.chatId || crypto.randomUUID());
+    const userId = String(variableValues.userId || "");
+    const name = String(variableValues.name || "");
+    const email = String(variableValues.email || "");
+    const phone = String(variableValues.phone || "");
+
+    // Execute tools
     if (message.type === "tool-calls") {
-      return handleToolCalls(message);
+      const results = await Promise.all(
+        (message.toolCallList ?? []).map(async (toolCall, index) => {
+          const toolCallId = toolCall.id ? toolCall.id : `tool-call-${index}`;
+          const toolName = String(
+            toolCall.function?.name || toolCall.name || "",
+          );
+
+          if (!toolName) {
+            return {
+              error: "Tool call payload was invalid.",
+              name: "unknown",
+              toolCallId,
+            };
+          }
+
+          let parameters: Record<string, unknown> = {};
+
+          if (toolCall.parameters) {
+            parameters = toolCall.parameters;
+          } else if (typeof toolCall.function?.arguments === "string") {
+            parameters = JSON.parse(toolCall.function.arguments);
+          } else if (toolCall.function?.arguments) {
+            parameters = toolCall.function.arguments;
+          }
+
+          const assistantToolCall = {
+            id: toolCallId,
+            type: "function" as const,
+            function: {
+              arguments: JSON.stringify(parameters),
+              name: toolName,
+            },
+          };
+          let result;
+
+          if (toolName === "list_events_in_range") {
+            result = await executeEventTool(assistantToolCall);
+          } else if (toolName === "request_human_handoff") {
+            result = {
+              ok: true,
+              message: "request_human_handoff completed",
+              data: {
+                reason:
+                  typeof parameters.reason === "string" ? parameters.reason : "",
+              },
+              intent: "human_handoff",
+            };
+          } else {
+            result = await executeBookingTool(assistantToolCall, {
+              chatId,
+              userId,
+            });
+          }
+
+          if (userId && result.userProfile) {
+            await upsertUserProfile({
+              userId,
+              lastChatSessionId: chatId,
+              ...result.userProfile,
+            });
+          }
+          await upsertChatSession({
+            bookingStatus: result.bookingStatus,
+            chatId,
+            lastIntent: result.intent,
+            userId,
+          });
+
+          if (!result.ok) {
+            return {
+              error: result.message,
+              name: toolName,
+              toolCallId,
+            };
+          }
+
+          return {
+            name: toolName,
+            result: JSON.stringify(result),
+            toolCallId,
+          };
+        }),
+      );
+
+      return Response.json({ results });
     }
 
+    // Persist the latest voice conversation snapshot and final transcript in Sheets.
     if (
       message.type === "conversation-update" ||
       message.type === "end-of-call-report"
     ) {
-      await handleConversationUpdate(message);
+      const messages = (
+        message.messagesOpenAIFormatted ??
+        message.artifact?.messagesOpenAIFormatted ??
+        []
+      )
+        .filter(
+          (entry) => entry.role === "user" || entry.role === "assistant",
+        )
+        .map<OpenAIChatMessage>((entry) => ({
+          role: entry.role as OpenAIChatMessage["role"],
+          content: String(entry.content || ""),
+        }));
+
+      if (userId) {
+        await upsertUserProfile({
+          userId,
+          lastChatSessionId: chatId,
+          name,
+          email,
+          phone,
+          role: "user",
+        });
+      }
+      await upsertChatSession({
+        chatId,
+        conversation: JSON.stringify(messages),
+        conversationSummary: message.artifact?.transcript,
+        userId,
+      });
     }
 
     return Response.json({ ok: true });

@@ -1,20 +1,19 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-import { bookingTools } from "@/lib/tools/booking";
-import { eventLookupTools } from "@/lib/tools/event";
-import { createSheetApi } from "@/hooks/useSheet";
-import type { ChatRequestBody } from "@/types/chat.types";
-
-import { maxToolRounds, assistantInstructions } from "@/lib/chat/chatConstants";
+import { useSheet } from "@/hooks/useSheet";
+import { assistantInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
 import {
   createCurrentDateContext,
   createKnownUserContext,
   createOpenAIClient,
 } from "@/lib/chat/chatHelpers";
+import { bookingTools } from "@/lib/tools/booking";
+import { eventLookupTools } from "@/lib/tools/event";
 import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
+import type { ChatRequestBody } from "@/types/chat.types";
 
-const { upsertChatSession, upsertUserProfile } = createSheetApi();
+const { upsertChatSession, upsertUserProfile } = useSheet();
 
 export async function POST(request: Request) {
   try {
@@ -30,13 +29,13 @@ export async function POST(request: Request) {
 
     const session = body.userId
       ? await upsertUserProfile({
-        userId: body.userId,
-        lastChatSessionId: toolContext.chatId,
-        name: body.userProfile?.name,
-        email: body.userProfile?.email,
-        phone: body.userProfile?.phone,
-        role: "user",
-      })
+          userId: body.userId,
+          lastChatSessionId: toolContext.chatId,
+          name: body.userProfile?.name,
+          email: body.userProfile?.email,
+          phone: body.userProfile?.phone,
+          role: "user",
+        })
       : null;
 
     const messages = clientMessages;
@@ -82,14 +81,11 @@ export async function POST(request: Request) {
     let lastIntent = "chat";
     const knownUserContext = createKnownUserContext(body.userProfile);
     const conversationMemory: ChatCompletionMessageParam[] = [
-      // System prompt
       {
         role: "system",
         content: assistantInstructions,
       },
-      // Date context
       createCurrentDateContext(),
-      // User context
       ...(knownUserContext ? [knownUserContext] : []),
       ...messages,
     ];

@@ -78,6 +78,38 @@ export type VapiWebhookPayload = {
   message?: VapiWebhookMessage;
 };
 
+export type VapiRouteMessageEntry = {
+  content?: string | null;
+  role?: string;
+};
+
+export type VapiRouteToolCall = {
+  function?: {
+    arguments?: Record<string, unknown> | string;
+    name?: string;
+  };
+  id?: string;
+  name?: string;
+  parameters?: Record<string, unknown>;
+};
+
+export type VapiRouteArtifact = {
+  messagesOpenAIFormatted?: VapiRouteMessageEntry[];
+  transcript?: string;
+  variableValues?: Record<string, unknown>;
+};
+
+export type VapiRouteMessage = {
+  artifact?: VapiRouteArtifact;
+  messagesOpenAIFormatted?: VapiRouteMessageEntry[];
+  toolCallList?: VapiRouteToolCall[];
+  type?: string;
+};
+
+export type VapiRoutePayload = {
+  message?: VapiRouteMessage;
+};
+
 export type UseVapiCallOptions = {
   assistantId: string;
   chatId: string;

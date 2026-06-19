@@ -57,7 +57,7 @@ const eventSheetHeaders = [
   "updated_at",
 ] as const;
 
-export function createSheetApi() {
+export function useSheet() {
   async function getRows(range: string, headers: readonly string[]) {
     const valuesResponse = await getSheetValues({
       accessToken: await getGoogleAccessToken(),

@@ -1,6 +1,6 @@
 import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
-import { createSheetApi } from "@/hooks/useSheet";
+import { useSheet as sheetApi } from "@/hooks/useSheet";
 import type { ToolResult, WorkspaceToolContext } from "@/types/tools.types";
 
 const {
@@ -11,7 +11,7 @@ const {
   findUserById,
   getUserBookingDetails,
   upsertUserProfile,
-} = createSheetApi();
+} = sheetApi();
 
 function resolveEventName(args: Record<string, unknown>) {
   const eventName = args["eventName"];

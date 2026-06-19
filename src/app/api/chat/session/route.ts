@@ -1,7 +1,7 @@
-import { createSheetApi } from "@/hooks/useSheet";
+import { useSheet as sheetApi } from "@/hooks/useSheet";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 
-const { upsertUserProfile } = createSheetApi();
+const { upsertUserProfile } = sheetApi();
 
 export async function GET(request: Request) {
   try {

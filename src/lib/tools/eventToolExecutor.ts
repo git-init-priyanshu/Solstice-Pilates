@@ -1,6 +1,6 @@
 import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
-import { createSheetApi } from "@/hooks/useSheet";
+import { useSheet as sheetApi } from "@/hooks/useSheet";
 import { getGoogleAccessToken } from "@/lib/googleApi";
 import type { EventRecord } from "@/types/event.types";
 import type { ToolResult } from "@/types/tools.types";
@@ -11,7 +11,7 @@ const {
   findEventById,
   listEventsInRange,
   updateEventRecord,
-} = createSheetApi();
+} = sheetApi();
 
 export async function executeEventTool(
   toolCall: ChatCompletionMessageFunctionToolCall,

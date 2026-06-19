@@ -1,6 +1,6 @@
 import type { OpenAIChatMessage } from "@/types/openai.types";
 
-import { createSheetApi } from "@/hooks/useSheet";
+import { useSheet as sheetApi } from "@/hooks/useSheet";
 
 const {
   findChatById,
@@ -8,7 +8,7 @@ const {
   listHandoffChats,
   upsertChatSession,
   upsertUserProfile,
-} = createSheetApi();
+} = sheetApi();
 
 export async function GET() {
   try {

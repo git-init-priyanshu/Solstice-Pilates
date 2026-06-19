@@ -6,6 +6,7 @@ import { LoaderCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ChatHeader from "@/components/chat/ChatHeader";
 import { useChat } from "@/hooks/useChat";
+import { useVapiCall } from "@/hooks/useVapiCall";
 import type { ChatPanelProps } from "@/types/chat.types";
 
 export function ChatPanel({
@@ -19,17 +20,34 @@ export function ChatPanel({
   userIdStorageKey,
 }: ChatPanelProps) {
   const {
+    chatId,
     chatInput,
     handleChatSubmit,
     isLoading,
     messages,
+    profile,
     setChatInput,
     submitChatMessage,
+    userId,
   } = useChat({
     apiPath,
     role,
     sessionApiPath,
     userIdStorageKey,
+  });
+  
+  const {
+    callStatus,
+    endCall,
+    hasAssistant,
+    isReady: isVoiceReady,
+    startCall,
+  } = useVapiCall({
+    assistantId: process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "",
+    chatId,
+    publicKey: process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "",
+    userId,
+    userProfile: profile,
   });
 
   function handleEnterKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -44,7 +62,15 @@ export function ChatPanel({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <ChatHeader subtitle={subtitle} title={title} />
+      <ChatHeader
+        callStatus={callStatus}
+        hasAssistant={hasAssistant}
+        isVoiceReady={isVoiceReady}
+        onEndCall={endCall}
+        onStartCall={startCall}
+        subtitle={subtitle}
+        title={title}
+      />
       <div className="min-h-0 flex-1 overflow-y-auto bg-blue-50 px-4 py-5">
         <div className="flex flex-col gap-4">
           {messages.map((message) => (

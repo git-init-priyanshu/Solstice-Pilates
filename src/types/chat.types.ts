@@ -1,5 +1,6 @@
 import type { OpenAIChatMessage } from "@/types/openai.types";
 import type { UserProfile } from "@/types/session.types";
+import type { VoiceCallStatus } from "@/types/vapi.types";
 
 export type ChatMessage = {
   id: string;
@@ -34,6 +35,11 @@ export type ChatPanelProps = {
 };
 
 export type ChatHeaderProps = {
+  callStatus?: VoiceCallStatus;
+  hasAssistant?: boolean;
+  isVoiceReady?: boolean;
+  onEndCall?: () => void;
+  onStartCall?: () => void;
   subtitle: string;
   title: string;
 };

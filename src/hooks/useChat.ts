@@ -152,11 +152,14 @@ export function useChat({
   }
 
   return {
+    chatId,
     chatInput,
     handleChatSubmit,
     isLoading,
     messages,
+    profile,
     setChatInput,
     submitChatMessage,
+    userId,
   };
 }

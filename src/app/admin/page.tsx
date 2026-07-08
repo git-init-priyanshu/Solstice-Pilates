@@ -152,11 +152,15 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="h-svh overflow-hidden bg-blue-50 p-4 text-slate-950 md:p-8">
-      <section className="mx-auto flex h-full max-w-6xl overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm">
-        <aside className="flex w-full max-w-xs shrink-0 flex-col border-r border-blue-100">
-          <ChatHeader subtitle="Admin chats" title="Solstice Pilates Admin" />
-          <div className="border-b border-blue-100 p-3">
+    <main className="h-svh overflow-hidden bg-background p-4 text-foreground md:p-8">
+      <section className="mx-auto flex h-full max-w-6xl overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <aside className="flex w-full max-w-xs shrink-0 flex-col border-r border-border">
+          <ChatHeader
+            showThemeToggle
+            subtitle="Admin chats"
+            title="Solstice Pilates Admin"
+          />
+          <div className="border-b border-border p-3">
             <Button
               className="w-full"
               disabled={isLoading}
@@ -173,14 +177,14 @@ export default function AdminPage() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <button
-              className={`w-full border-b border-blue-50 px-4 py-3 text-left transition hover:bg-blue-50 ${
-                selectedChatId === "assistant" ? "bg-blue-50" : "bg-white"
+              className={`w-full border-b border-border px-4 py-3 text-left transition hover:bg-muted ${
+                selectedChatId === "assistant" ? "bg-muted" : "bg-card"
               }`}
               onClick={() => setSelectedChatId("assistant")}
               type="button"
             >
-              <p className="text-sm font-semibold text-slate-950">Assistant</p>
-              <p className="mt-1 truncate text-sm text-slate-600">
+              <p className="text-sm font-semibold text-foreground">Assistant</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
                 Create events and manage the studio schedule.
               </p>
             </button>
@@ -192,22 +196,22 @@ export default function AdminPage() {
 
               return (
                 <button
-                  className={`w-full border-b border-blue-50 px-4 py-3 text-left transition hover:bg-blue-50 ${
+                  className={`w-full border-b border-border px-4 py-3 text-left transition hover:bg-muted ${
                     selectedHandoffChat?.user.userId === chat.user.userId
-                      ? "bg-blue-50"
-                      : "bg-white"
+                      ? "bg-muted"
+                      : "bg-card"
                   }`}
                   key={chat.user.userId}
                   onClick={() => setSelectedChatId(chat.user.userId)}
                   type="button"
                 >
-                  <p className="text-sm font-semibold text-slate-950">
+                  <p className="text-sm font-semibold text-foreground">
                     {chat.user.name || "Unnamed user"}
                   </p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-xs text-muted-foreground">
                     {chat.user.email || chat.user.phone || chat.user.userId}
                   </p>
-                  <p className="mt-1 truncate text-sm text-slate-600">
+                  <p className="mt-1 truncate text-sm text-muted-foreground">
                     {lastMessage?.content || "No user message yet."}
                   </p>
                 </button>
@@ -215,7 +219,7 @@ export default function AdminPage() {
             })}
 
             {!isLoading && !chats.length ? (
-              <div className="px-4 py-6 text-sm text-slate-500">
+              <div className="px-4 py-6 text-sm text-muted-foreground">
                 No handoff chats right now.
               </div>
             ) : null}
@@ -246,13 +250,13 @@ export default function AdminPage() {
                 title={selectedHandoffChat?.user.name || "Human handoff"}
               />
 
-              <div className="border-b border-blue-100 bg-white px-4 py-3 text-sm text-slate-600">
+              <div className="border-b border-border bg-card px-4 py-3 text-sm text-muted-foreground">
                 {selectedHandoffChat
                   ? `Reply here to continue ${selectedHandoffChat.user.name || "this user's"} conversation.`
                   : "Choose a handoff chat to reply."}
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto bg-blue-50 px-4 py-5">
+              <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 px-4 py-5">
                 <div className="flex flex-col gap-4">
                   {selectedHandoffChat?.messages.map((message, index) => (
                     <div
@@ -260,10 +264,10 @@ export default function AdminPage() {
                       key={`${message.role}-${index}-${message.content}`}
                     >
                       <div
-                        className={`max-w-[78%] rounded-lg px-4 py-3 text-left shadow-sm ${
+                        className={`max-w-[78%] rounded-2xl px-4 py-3 text-left shadow-sm ${
                           message.role === "user"
-                            ? "bg-blue-700 text-white"
-                            : "border border-blue-100 bg-white text-slate-950"
+                            ? "rounded-br-sm bg-primary text-primary-foreground"
+                            : "rounded-bl-sm border border-border bg-card text-card-foreground"
                         }`}
                       >
                         <p className="text-xs font-medium uppercase tracking-wide opacity-70">
@@ -274,7 +278,7 @@ export default function AdminPage() {
                     </div>
                   ))}
                   {!selectedHandoffChat && !isLoading ? (
-                    <div className="text-sm text-slate-500">
+                    <div className="text-sm text-muted-foreground">
                       No conversation selected.
                     </div>
                   ) : null}
@@ -282,12 +286,12 @@ export default function AdminPage() {
               </div>
 
               <form
-                className="shrink-0 border-t border-blue-100 bg-white p-3"
+                className="shrink-0 border-t border-border bg-card p-3"
                 onSubmit={sendReply}
               >
                 <div className="flex items-end gap-2">
                   <textarea
-                    className="min-h-10 flex-1 resize-none rounded-md border border-blue-100 bg-white px-3 py-2 text-sm leading-5 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    className="min-h-10 flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
                     disabled={!selectedHandoffChat || isSending}
                     onChange={(event) => setReply(event.target.value)}
                     placeholder="Write the assistant reply for this user"

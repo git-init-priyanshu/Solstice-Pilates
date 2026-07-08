@@ -28,6 +28,7 @@ export type ChatPanelProps = {
   placeholder?: string;
   role?: "admin" | "user";
   sessionApiPath?: string;
+  showThemeToggle?: boolean;
   subtitle?: string;
   title?: string;
   typingLabel?: string;
@@ -40,6 +41,7 @@ export type ChatHeaderProps = {
   isVoiceReady?: boolean;
   onEndCall?: () => void;
   onStartCall?: () => void;
+  showThemeToggle?: boolean;
   subtitle: string;
   title: string;
 };

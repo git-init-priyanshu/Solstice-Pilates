@@ -14,6 +14,7 @@ export function ChatPanel({
   placeholder = "Ask about classes, booking, pricing, or call the studio",
   role = "user",
   sessionApiPath = "/api/chat/session",
+  showThemeToggle = false,
   subtitle = "AI assistant",
   title = "Solstice Pilates",
   typingLabel = "Solstice Pilates is typing...",
@@ -68,10 +69,11 @@ export function ChatPanel({
         isVoiceReady={isVoiceReady}
         onEndCall={endCall}
         onStartCall={startCall}
+        showThemeToggle={showThemeToggle}
         subtitle={subtitle}
         title={title}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto bg-blue-50 px-4 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 px-4 py-5">
         <div className="flex flex-col gap-4">
           {messages.map((message) => (
             <div
@@ -79,10 +81,10 @@ export function ChatPanel({
               key={message.id}
             >
               <div
-                className={`max-w-[78%] rounded-lg px-4 py-3 text-left shadow-sm ${
+                className={`max-w-[78%] rounded-2xl px-4 py-3 text-left shadow-sm ${
                   message.sender === "User"
-                    ? "bg-blue-700 text-white"
-                    : "border border-blue-100 bg-white text-slate-950"
+                    ? "rounded-br-sm bg-primary text-primary-foreground"
+                    : "rounded-bl-sm border border-border bg-card text-card-foreground"
                 }`}
               >
                 <p className="text-sm leading-6">{message.text}</p>
@@ -90,8 +92,8 @@ export function ChatPanel({
                   <span
                     className={`mt-2 block text-right text-xs ${
                       message.sender === "User"
-                        ? "text-blue-100"
-                        : "text-slate-500"
+                        ? "text-primary-foreground/70"
+                        : "text-muted-foreground"
                     }`}
                   >
                     {message.time}
@@ -102,7 +104,7 @@ export function ChatPanel({
           ))}
           {isAwaitingReply && (
             <div className="flex justify-start">
-              <div className="rounded-lg border border-blue-100 bg-white px-4 py-3 text-left text-sm text-slate-500 shadow-sm">
+              <div className="rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3 text-left text-sm text-muted-foreground shadow-sm">
                 {typingLabel}
               </div>
             </div>
@@ -111,12 +113,12 @@ export function ChatPanel({
       </div>
 
       <form
-        className="shrink-0 border-t border-blue-100 bg-white p-3"
+        className="shrink-0 border-t border-border bg-card p-3"
         onSubmit={handleChatSubmit}
       >
         <div className="flex items-end gap-2">
           <textarea
-            className="min-h-10 flex-1 resize-none rounded-md border border-blue-100 bg-white px-3 py-2 text-sm leading-5 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="min-h-10 flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
             disabled={isLoading}
             onChange={(event) => setChatInput(event.target.value)}
             placeholder={placeholder}

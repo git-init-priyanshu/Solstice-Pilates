@@ -1,4 +1,4 @@
-import { useSheet as sheetApi } from "@/hooks/useSheet";
+import { useDatabase as sheetApi } from "@/lib/database";
 import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 import type { OpenAIChatMessage } from "@/types/openai.types";

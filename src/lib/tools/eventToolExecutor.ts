@@ -1,6 +1,6 @@
 import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
-import { useSheet as sheetApi } from "@/hooks/useSheet";
+import { useDatabase as sheetApi } from "@/lib/database";
 import { getGoogleAccessToken } from "@/lib/googleApi";
 import type { EventRecord } from "@/types/event.types";
 import type { ToolResult } from "@/types/tools.types";

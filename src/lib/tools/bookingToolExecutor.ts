@@ -1,6 +1,6 @@
 import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
-import { useSheet as sheetApi } from "@/hooks/useSheet";
+import { useDatabase as sheetApi } from "@/lib/database";
 import type { ToolResult, WorkspaceToolContext } from "@/types/tools.types";
 
 const {

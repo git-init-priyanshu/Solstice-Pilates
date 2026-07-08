@@ -1,6 +1,6 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-import { useSheet } from "@/hooks/useSheet";
+import { useDatabase } from "@/lib/database";
 import { assistantInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
 import {
   createCurrentDateContext,
@@ -13,7 +13,7 @@ import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 import type { ChatRequestBody } from "@/types/chat.types";
 
-const { upsertChatSession, upsertUserProfile } = useSheet();
+const { upsertChatSession, upsertUserProfile } = useDatabase();
 
 export async function POST(request: Request) {
   try {

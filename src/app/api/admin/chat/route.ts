@@ -1,6 +1,6 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-import { useSheet as sheetApi } from "@/hooks/useSheet";
+import { useDatabase as sheetApi } from "@/lib/database";
 import { adminInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
 import {
   createCurrentDateContext,

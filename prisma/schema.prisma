@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id
+  name              String   @default("")
+  email             String   @default("")
+  phone             String   @default("")
+  lastChatSessionId String   @default("")
+  bookingStatus     String   @default("")
+  bookedEventId     String   @default("")
+  role              String   @default("user")
+  createdAt         DateTime @default(now())
+
+  @@map("users")
+}
+
+model Chat {
+  id                  String   @id
+  userId              String   @default("")
+  conversation        String   @default("[]")
+  conversationSummary String   @default("")
+  lastIntent          String   @default("")
+  bookingStatus       String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("chats")
+}
+
+model Event {
+  id              String   @id
+  name            String
+  startTime       String
+  endTime         String
+  pricingPerHour  Float
+  capacity        Int
+  bookedCustomers Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("events")
+}

@@ -1,6 +1,6 @@
 import type { OpenAIChatMessage } from "@/types/openai.types";
 
-import { useSheet as sheetApi } from "@/hooks/useSheet";
+import { useDatabase as sheetApi } from "@/lib/database";
 
 const {
   findChatById,

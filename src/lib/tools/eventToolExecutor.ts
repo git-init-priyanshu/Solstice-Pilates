@@ -98,6 +98,25 @@ export async function executeEventTool(
           capacity: Number(args["capacity"] ?? existingEvent.capacity),
         };
 
+        if (typeof updatedEvent.name !== "string" || updatedEvent.name.trim() === "") {
+          throw new Error("An event name is required.");
+        }
+        if (
+          Number.isNaN(Date.parse(updatedEvent.startTime)) ||
+          Number.isNaN(Date.parse(updatedEvent.endTime))
+        ) {
+          throw new Error("startTime and endTime must be valid date-times.");
+        }
+        if (Date.parse(updatedEvent.endTime) <= Date.parse(updatedEvent.startTime)) {
+          throw new Error("endTime must be after startTime.");
+        }
+        if (!Number.isFinite(updatedEvent.pricingPerHour) || updatedEvent.pricingPerHour < 0) {
+          throw new Error("pricingPerHour must be a non-negative number.");
+        }
+        if (!Number.isFinite(updatedEvent.capacity) || updatedEvent.capacity < 1) {
+          throw new Error("capacity must be a positive number.");
+        }
+
         const shouldUpdateCalendar =
           updatedEvent.name !== existingEvent.name ||
           updatedEvent.startTime !== existingEvent.startTime ||

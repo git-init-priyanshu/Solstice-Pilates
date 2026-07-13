@@ -250,7 +250,11 @@ export async function executeBookingTool(
       }
 
       case "check_booking_guest_capacity": {
-        const additionalGuests = Number(args["additionalGuests"]);
+        const requestedGuests = Number(args["additionalGuests"]);
+        const additionalGuests =
+          Number.isFinite(requestedGuests) && requestedGuests > 0
+            ? requestedGuests
+            : 1;
         const booking = await getUserBookingDetails(userId);
 
         if (!booking?.event) {

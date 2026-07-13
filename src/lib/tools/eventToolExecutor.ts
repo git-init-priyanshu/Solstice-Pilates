@@ -27,6 +27,22 @@ export async function executeEventTool(
         const pricingPerHour = Number(args["pricingPerHour"]);
         const capacity = Number(args["capacity"]);
 
+        if (typeof name !== "string" || name.trim() === "") {
+          throw new Error("An event name is required.");
+        }
+        if (Number.isNaN(Date.parse(startTime)) || Number.isNaN(Date.parse(endTime))) {
+          throw new Error("startTime and endTime must be valid date-times.");
+        }
+        if (Date.parse(endTime) <= Date.parse(startTime)) {
+          throw new Error("endTime must be after startTime.");
+        }
+        if (!Number.isFinite(pricingPerHour) || pricingPerHour < 0) {
+          throw new Error("pricingPerHour must be a non-negative number.");
+        }
+        if (!Number.isFinite(capacity) || capacity < 1) {
+          throw new Error("capacity must be a positive number.");
+        }
+
         // Create event in calendar
         const accessToken = await getGoogleAccessToken();
         const calendarEvent = await scheduleCalendarEvent({

@@ -86,6 +86,15 @@ export async function executeBookingTool(
         if (isSameEvent && !isGuestBooking) {
           throw new Error("The user is already booked into that event.");
         }
+        const isBookedElsewhere =
+          existingUser?.bookingStatus === "booked" &&
+          Boolean(existingUser.bookedEventId) &&
+          existingUser.bookedEventId !== event.eventId;
+        if (isBookedElsewhere && !isGuestBooking) {
+          throw new Error(
+            "The user already has a booking for a different event. Use change_user_booking to move the booking.",
+          );
+        }
         if (event.bookedCustomers >= event.capacity) {
           throw new Error("This event is already full.");
         }

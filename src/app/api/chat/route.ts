@@ -3,6 +3,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { useDatabase as sheetApi } from "@/lib/database";
 import { assistantInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
 import {
+  chatModel,
   createCurrentDateContext,
   createKnownUserContext,
   createOpenAIClient,
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
 
     for (let round = 0; round < maxToolRounds; round += 1) {
       const response = await openAiClient.chat.completions.create({
-        model: "openai/gpt-4o-mini",
+        model: chatModel,
         messages: conversationMemory,
         tools: [...eventLookupTools, ...bookingTools],
         tool_choice: "auto",

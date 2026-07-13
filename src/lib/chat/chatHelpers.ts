@@ -5,6 +5,8 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import type { ChatRequestBody } from "@/types/chat.types";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 
+export const chatModel = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
+
 export function createOpenAIClient() {
   const apiKey = process.env.OPENROUTER_API_KEY;
 
@@ -17,7 +19,7 @@ export function createOpenAIClient() {
     baseURL: "https://openrouter.ai/api/v1",
     defaultHeaders: {
       ...(process.env.APP_URL ? { "HTTP-Referer": process.env.APP_URL } : {}),
-      "X-OpenRouter-Title": "Solstice Pilates",
+      "X-Title": "Solstice Pilates",
     },
   });
 }

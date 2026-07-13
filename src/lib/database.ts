@@ -375,7 +375,7 @@ export function useDatabase() {
     const updatedChat = await prisma.chat.update({
       where: { id: chatId },
       data: {
-        userId,
+        userId: userId || existingChat.userId,
         conversation: conversation ?? existingChat.conversation,
         conversationSummary:
           conversationSummary ?? existingChat.conversationSummary,

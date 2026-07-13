@@ -112,12 +112,20 @@ export function useDatabase() {
       .map((user) => {
         const chat = chatById.get(user.lastChatSessionId);
         const conversation = chat?.conversation || "";
-        const messages = conversation
-          ? (JSON.parse(conversation) as Array<{
+        let messages: Array<{
+          content: string;
+          role: "assistant" | "user";
+        }> = [];
+        if (conversation) {
+          try {
+            messages = JSON.parse(conversation) as Array<{
               content: string;
               role: "assistant" | "user";
-            }>)
-          : [];
+            }>;
+          } catch {
+            messages = [];
+          }
+        }
 
         if (
           !chat ||
@@ -375,7 +383,7 @@ export function useDatabase() {
     const updatedChat = await prisma.chat.update({
       where: { id: chatId },
       data: {
-        userId,
+        userId: userId || existingChat.userId,
         conversation: conversation ?? existingChat.conversation,
         conversationSummary:
           conversationSummary ?? existingChat.conversationSummary,

@@ -352,7 +352,7 @@ export function useDatabase() {
   async function upsertChatSession({
     chatId,
     userId,
-    conversation = JSON.stringify([]),
+    conversation,
     conversationSummary,
     lastIntent,
     bookingStatus,
@@ -376,7 +376,7 @@ export function useDatabase() {
       where: { id: chatId },
       data: {
         userId,
-        conversation,
+        conversation: conversation ?? existingChat.conversation,
         conversationSummary:
           conversationSummary ?? existingChat.conversationSummary,
         lastIntent: lastIntent ?? existingChat.lastIntent,

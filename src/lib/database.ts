@@ -245,10 +245,24 @@ export function useDatabase() {
       throw new Error("This event is already full.");
     }
 
-    return updateEventRecord({
-      ...event,
-      bookedCustomers: nextBookedCustomers,
+    const { count } = await prisma.event.updateMany({
+      where: { id: eventId, bookedCustomers: event.bookedCustomers },
+      data: { bookedCustomers: nextBookedCustomers },
     });
+
+    if (count === 0) {
+      throw new Error(
+        "This event was just updated by someone else. Please try again.",
+      );
+    }
+
+    const updatedEvent = await findEventById(eventId);
+
+    if (!updatedEvent) {
+      throw new Error("The event could not be found.");
+    }
+
+    return updatedEvent;
   }
 
   async function createChatSession({

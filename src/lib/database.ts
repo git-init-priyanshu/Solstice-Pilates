@@ -112,12 +112,20 @@ export function useDatabase() {
       .map((user) => {
         const chat = chatById.get(user.lastChatSessionId);
         const conversation = chat?.conversation || "";
-        const messages = conversation
-          ? (JSON.parse(conversation) as Array<{
+        let messages: Array<{
+          content: string;
+          role: "assistant" | "user";
+        }> = [];
+        if (conversation) {
+          try {
+            messages = JSON.parse(conversation) as Array<{
               content: string;
               role: "assistant" | "user";
-            }>)
-          : [];
+            }>;
+          } catch {
+            messages = [];
+          }
+        }
 
         if (
           !chat ||

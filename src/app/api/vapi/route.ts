@@ -184,7 +184,7 @@ export async function POST(request: Request) {
       }
       await upsertChatSession({
         chatId,
-        conversation: JSON.stringify(messages),
+        ...(messages.length ? { conversation: JSON.stringify(messages) } : {}),
         conversationSummary: message.artifact?.transcript,
         userId,
       });

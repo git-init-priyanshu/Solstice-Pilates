@@ -39,6 +39,18 @@ export async function executeBookingTool(
 ): Promise<ToolResult> {
   try {
     const args = JSON.parse(toolCall.function.arguments || "");
+
+    if (toolCall.function.name === "request_human_handoff") {
+      return {
+        ok: true,
+        message: "request_human_handoff completed",
+        intent: "human_handoff",
+        data: {
+          reason: typeof args["reason"] === "string" ? args["reason"] : "",
+        },
+      };
+    }
+
     const userId = toolContext.userId;
 
     if (!userId) {
@@ -274,7 +286,9 @@ export async function executeBookingTool(
                 ? "booking_change_lookup"
                 : toolCall.function.name === "check_booking_guest_capacity"
                   ? "booking_guest_capacity"
-                  : undefined,
+                  : toolCall.function.name === "request_human_handoff"
+                    ? "human_handoff"
+                    : undefined,
       message: "Booking tool failed",
     };
   }

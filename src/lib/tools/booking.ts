@@ -63,6 +63,26 @@ export const bookingTools: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "cancel_user_booking",
+      description:
+        "Cancel the current user's existing event booking after the user explicitly confirms the cancellation.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          confirmedByCustomer: {
+            type: "boolean",
+            description:
+              "True only if the user explicitly confirmed the cancellation.",
+          },
+        },
+        required: ["confirmedByCustomer"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "request_human_handoff",
       description:
         "Escalate the conversation to a human studio admin for billing complaints, refunds, safety concerns, private events, or when the client explicitly asks for a person.",

@@ -183,6 +183,51 @@ export async function executeBookingTool(
         };
       }
 
+      case "cancel_user_booking": {
+        const confirmedByCustomer = args["confirmedByCustomer"] === true;
+
+        if (!confirmedByCustomer) {
+          throw new Error(
+            "Customer must explicitly confirm before cancelling the booking.",
+          );
+        }
+
+        const existingUser = await findUserById(userId);
+        const bookedEventId =
+          existingUser?.bookingStatus === "booked"
+            ? existingUser.bookedEventId
+            : "";
+        if (!bookedEventId) {
+          throw new Error(
+            "The user does not have a current event booking to cancel.",
+          );
+        }
+
+        const updatedEvent = await adjustEventBookedCustomers(
+          bookedEventId,
+          -1,
+        );
+
+        const session = await upsertUserProfile({
+          userId,
+          bookedEventId: "",
+          bookingStatus: "",
+          lastChatSessionId: toolContext.chatId,
+        });
+
+        return {
+          ok: true,
+          message: "cancel_user_booking completed",
+          bookingStatus: session.user.bookingStatus,
+          data: {
+            bookingStatus: session.user.bookingStatus,
+            event: updatedEvent,
+            user: session.user,
+          },
+          intent: "booking_cancel",
+        };
+      }
+
       case "get_user_booking_status": {
         const booking = await getUserBookingDetails(userId);
 
@@ -280,15 +325,17 @@ export async function executeBookingTool(
           ? "booking"
           : toolCall.function.name === "change_user_booking"
             ? "booking_change"
-            : toolCall.function.name === "get_user_booking_status"
-              ? "booking_status"
-              : toolCall.function.name === "find_alternative_event_options"
-                ? "booking_change_lookup"
-                : toolCall.function.name === "check_booking_guest_capacity"
-                  ? "booking_guest_capacity"
-                  : toolCall.function.name === "request_human_handoff"
-                    ? "human_handoff"
-                    : undefined,
+            : toolCall.function.name === "cancel_user_booking"
+              ? "booking_cancel"
+              : toolCall.function.name === "get_user_booking_status"
+                ? "booking_status"
+                : toolCall.function.name === "find_alternative_event_options"
+                  ? "booking_change_lookup"
+                  : toolCall.function.name === "check_booking_guest_capacity"
+                    ? "booking_guest_capacity"
+                    : toolCall.function.name === "request_human_handoff"
+                      ? "human_handoff"
+                      : undefined,
       message: "Booking tool failed",
     };
   }

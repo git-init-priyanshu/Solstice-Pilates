@@ -10,7 +10,18 @@ const {
   upsertUserProfile,
 } = sheetApi();
 
-export async function GET() {
+function isAuthorizedAdmin(request: Request) {
+  const secret = process.env.ADMIN_API_SECRET;
+  const authorization = request.headers.get("authorization");
+
+  return !secret || authorization === `Bearer ${secret}`;
+}
+
+export async function GET(request: Request) {
+  if (!isAuthorizedAdmin(request)) {
+    return Response.json({ message: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const chats = await listHandoffChats();
 
@@ -34,6 +45,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isAuthorizedAdmin(request)) {
+    return Response.json({ message: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const body = (await request.json()) as {
       adminUserId?: string;

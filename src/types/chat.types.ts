@@ -50,6 +50,7 @@ export type LLMReplyInput = {
   apiPath: string;
   chatId: string;
   messages: OpenAIChatMessage[];
+  role?: "admin" | "user";
   userId: string;
   userProfile: Pick<UserProfile, "email" | "name" | "phone">;
 };

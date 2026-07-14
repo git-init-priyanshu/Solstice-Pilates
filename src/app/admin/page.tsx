@@ -15,6 +15,11 @@ type HandoffChat = {
   user: UserProfile;
 };
 
+const adminSecret = process.env.NEXT_PUBLIC_ADMIN_API_SECRET;
+const adminAuthHeaders: Record<string, string> = adminSecret
+  ? { Authorization: `Bearer ${adminSecret}` }
+  : {};
+
 export default function AdminPage() {
   const [adminUserId] = useState(() => {
     if (typeof window === "undefined") {
@@ -41,9 +46,13 @@ export default function AdminPage() {
         return;
       }
 
-      await fetch(`/api/chat/session?userId=${adminUserId}&role=admin`);
+      await fetch(`/api/chat/session?userId=${adminUserId}&role=admin`, {
+        headers: adminAuthHeaders,
+      });
 
-      const response = await fetch("/api/admin/handoffs");
+      const response = await fetch("/api/admin/handoffs", {
+        headers: adminAuthHeaders,
+      });
       const payload = await response.json();
 
       if (!response.ok) {
@@ -79,7 +88,9 @@ export default function AdminPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/admin/handoffs");
+      const response = await fetch("/api/admin/handoffs", {
+        headers: adminAuthHeaders,
+      });
       const payload = await response.json();
 
       if (!response.ok) {
@@ -116,6 +127,7 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...adminAuthHeaders,
         },
         body: JSON.stringify({
           adminUserId,

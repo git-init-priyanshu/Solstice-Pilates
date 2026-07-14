@@ -5,13 +5,18 @@ export function useOpenAi() {
     apiPath,
     chatId,
     messages,
+    role,
     userId,
     userProfile,
   }: LLMReplyInput) {
+    const adminSecret = process.env.NEXT_PUBLIC_ADMIN_API_SECRET;
     const response = await fetch(apiPath, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(role === "admin" && adminSecret
+          ? { Authorization: `Bearer ${adminSecret}` }
+          : {}),
       },
       body: JSON.stringify({ chatId, messages, userId, userProfile }),
     });

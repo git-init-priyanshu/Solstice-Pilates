@@ -98,6 +98,30 @@ export async function executeEventTool(
           capacity: Number(args["capacity"] ?? existingEvent.capacity),
         };
 
+        if (
+          !Number.isFinite(updatedEvent.pricingPerHour) ||
+          updatedEvent.pricingPerHour < 0
+        ) {
+          throw new Error("pricingPerHour must be a non-negative number.");
+        }
+        if (!Number.isFinite(updatedEvent.capacity) || updatedEvent.capacity < 1) {
+          throw new Error("capacity must be a positive number.");
+        }
+        if (
+          updatedEvent.startTime !== existingEvent.startTime ||
+          updatedEvent.endTime !== existingEvent.endTime
+        ) {
+          if (
+            Number.isNaN(Date.parse(updatedEvent.startTime)) ||
+            Number.isNaN(Date.parse(updatedEvent.endTime))
+          ) {
+            throw new Error("startTime and endTime must be valid date-times.");
+          }
+          if (Date.parse(updatedEvent.endTime) <= Date.parse(updatedEvent.startTime)) {
+            throw new Error("endTime must be after startTime.");
+          }
+        }
+
         const shouldUpdateCalendar =
           updatedEvent.name !== existingEvent.name ||
           updatedEvent.startTime !== existingEvent.startTime ||
@@ -181,7 +205,7 @@ export async function executeEventTool(
           message: `Unknown event tool: ${toolCall.function.name}`,
         };
     }
-  } catch {
+  } catch (error) {
     return {
       ok: false,
       intent:
@@ -192,7 +216,10 @@ export async function executeEventTool(
             : toolCall.function.name === "list_events_in_range"
               ? "event_lookup"
               : undefined,
-      message: "Event tool failed",
+      message:
+        error instanceof Error && error.message
+          ? error.message
+          : "Event tool failed",
     };
   }
 }

@@ -245,6 +245,10 @@ export function useDatabase() {
       throw new Error("This event is already full.");
     }
 
+    if (nextBookedCustomers < 0) {
+      throw new Error("This event has no booked customers to remove.");
+    }
+
     const { count } = await prisma.event.updateMany({
       where: { id: eventId, bookedCustomers: event.bookedCustomers },
       data: { bookedCustomers: nextBookedCustomers },

@@ -86,6 +86,16 @@ export async function executeBookingTool(
         if (isSameEvent && !isGuestBooking) {
           throw new Error("The user is already booked into that event.");
         }
+        if (
+          !isGuestBooking &&
+          existingUser?.bookingStatus === "booked" &&
+          existingUser.bookedEventId &&
+          existingUser.bookedEventId !== event.eventId
+        ) {
+          throw new Error(
+            "The user already has a booking for another event. Use change_user_booking instead.",
+          );
+        }
         if (event.bookedCustomers >= event.capacity) {
           throw new Error("This event is already full.");
         }
@@ -159,8 +169,14 @@ export async function executeBookingTool(
 
         const previousEvent = await findEventById(previousBookedEventId);
 
-        await adjustEventBookedCustomers(previousBookedEventId, -1);
         const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
+
+        try {
+          await adjustEventBookedCustomers(previousBookedEventId, -1);
+        } catch (error) {
+          await adjustEventBookedCustomers(event.eventId, -1);
+          throw error;
+        }
 
         const session = await upsertUserProfile({
           userId,

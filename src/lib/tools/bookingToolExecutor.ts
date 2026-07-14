@@ -1,6 +1,7 @@
 import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
 import { useDatabase as sheetApi } from "@/lib/database";
+import { prisma } from "@/lib/prisma";
 import type { ToolResult, WorkspaceToolContext } from "@/types/tools.types";
 
 const {
@@ -90,8 +91,20 @@ export async function executeBookingTool(
           throw new Error("This event is already full.");
         }
 
+        const previousBookedEventId =
+          existingUser?.bookingStatus === "booked" &&
+          existingUser.bookedEventId !== event.eventId &&
+          !isGuestBooking
+            ? existingUser.bookedEventId
+            : "";
+
         const bookingUserId = isGuestBooking ? crypto.randomUUID() : userId;
-        const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
+        const updatedEvent = previousBookedEventId
+          ? await prisma.$transaction(async (tx) => {
+              await adjustEventBookedCustomers(previousBookedEventId, -1, tx);
+              return adjustEventBookedCustomers(event.eventId, 1, tx);
+            })
+          : await adjustEventBookedCustomers(event.eventId, 1);
         const session = await upsertUserProfile({
           userId: bookingUserId,
           bookedEventId: event.eventId,
@@ -159,8 +172,10 @@ export async function executeBookingTool(
 
         const previousEvent = await findEventById(previousBookedEventId);
 
-        await adjustEventBookedCustomers(previousBookedEventId, -1);
-        const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
+        const updatedEvent = await prisma.$transaction(async (tx) => {
+          await adjustEventBookedCustomers(previousBookedEventId, -1, tx);
+          return adjustEventBookedCustomers(event.eventId, 1, tx);
+        });
 
         const session = await upsertUserProfile({
           userId,

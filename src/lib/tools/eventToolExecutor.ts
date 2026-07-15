@@ -4,10 +4,15 @@ import { useDatabase as sheetApi } from "@/lib/database";
 import { getGoogleAccessToken } from "@/lib/googleApi";
 import type { EventRecord } from "@/types/event.types";
 import type { ToolResult } from "@/types/tools.types";
-import { scheduleCalendarEvent, updateCalendarEvent } from "@/lib/calendarApi";
+import {
+  cancelCalendarEvent,
+  scheduleCalendarEvent,
+  updateCalendarEvent,
+} from "@/lib/calendarApi";
 
 const {
   createEventRecord,
+  deleteEventRecord,
   findEventById,
   listEventsInRange,
   updateEventRecord,
@@ -155,6 +160,52 @@ export async function executeEventTool(
         };
       }
 
+      case "delete_event_record": {
+        if (args["confirmedByAdmin"] !== true) {
+          throw new Error(
+            "Admin must explicitly confirm before deleting the event.",
+          );
+        }
+
+        const eventId = args["eventId"];
+        if (typeof eventId !== "string" || eventId.trim() === "") {
+          throw new Error("An eventId is required.");
+        }
+
+        const existingEvent = await findEventById(eventId);
+        if (!existingEvent) {
+          throw new Error("The selected event could not be found.");
+        }
+
+        if (existingEvent.bookedCustomers > 0) {
+          throw new Error("Cannot delete an event that has active bookings.");
+        }
+
+        // Cancel event in calendar, tolerating an already-removed event.
+        try {
+          const accessToken = await getGoogleAccessToken();
+          await cancelCalendarEvent({
+            accessToken,
+            calendarId: "primary",
+            eventId,
+          });
+        } catch {
+          // The calendar event may already be gone; continue with deletion.
+        }
+
+        // Delete event from sheet
+        const deletedEvent = await deleteEventRecord(eventId);
+
+        return {
+          ok: true,
+          message: "delete_event_record completed",
+          data: {
+            deletedEvent,
+          },
+          intent: "admin_event_delete",
+        };
+      }
+
       case "list_events_in_range": {
         const startTime = args["startTime"] as string;
         const endTime = args["endTime"] as string;
@@ -213,9 +264,11 @@ export async function executeEventTool(
           ? "admin_event_create"
           : toolCall.function.name === "update_event_record"
             ? "admin_event_update"
-            : toolCall.function.name === "list_events_in_range"
-              ? "event_lookup"
-              : undefined,
+            : toolCall.function.name === "delete_event_record"
+              ? "admin_event_delete"
+              : toolCall.function.name === "list_events_in_range"
+                ? "event_lookup"
+                : undefined,
       message: error instanceof Error ? error.message : "Event tool failed",
     };
   }

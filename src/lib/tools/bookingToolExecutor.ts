@@ -92,15 +92,21 @@ export async function executeBookingTool(
 
         const bookingUserId = isGuestBooking ? crypto.randomUUID() : userId;
         const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
-        const session = await upsertUserProfile({
-          userId: bookingUserId,
-          bookedEventId: event.eventId,
-          bookingStatus: "booked",
-          lastChatSessionId: toolContext.chatId,
-          name: customerName,
-          email: customerEmail,
-          phone: customerPhone,
-        });
+        let session;
+        try {
+          session = await upsertUserProfile({
+            userId: bookingUserId,
+            bookedEventId: event.eventId,
+            bookingStatus: "booked",
+            lastChatSessionId: toolContext.chatId,
+            name: customerName,
+            email: customerEmail,
+            phone: customerPhone,
+          });
+        } catch (error) {
+          await adjustEventBookedCustomers(event.eventId, -1);
+          throw error;
+        }
 
         return {
           ok: true,
@@ -160,14 +166,28 @@ export async function executeBookingTool(
         const previousEvent = await findEventById(previousBookedEventId);
 
         await adjustEventBookedCustomers(previousBookedEventId, -1);
-        const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
 
-        const session = await upsertUserProfile({
-          userId,
-          bookedEventId: event.eventId,
-          bookingStatus: "booked",
-          lastChatSessionId: toolContext.chatId,
-        });
+        let updatedEvent;
+        try {
+          updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
+        } catch (error) {
+          await adjustEventBookedCustomers(previousBookedEventId, 1);
+          throw error;
+        }
+
+        let session;
+        try {
+          session = await upsertUserProfile({
+            userId,
+            bookedEventId: event.eventId,
+            bookingStatus: "booked",
+            lastChatSessionId: toolContext.chatId,
+          });
+        } catch (error) {
+          await adjustEventBookedCustomers(event.eventId, -1);
+          await adjustEventBookedCustomers(previousBookedEventId, 1);
+          throw error;
+        }
 
         return {
           ok: true,
@@ -216,8 +236,17 @@ export async function executeBookingTool(
           );
         }
 
+        const targetEventName =
+          typeof eventName === "string" && eventName.trim()
+            ? eventName.trim()
+            : booking.event.name;
+
         const allEvents = await listEventsInRange({ startTime, endTime });
         const alternatives = allEvents
+          .filter(
+            (event) =>
+              event.name.toLowerCase() === targetEventName.toLowerCase(),
+          )
           .filter((event) => event.eventId !== booking.event?.eventId)
           .map((event) => ({
             ...event,
@@ -234,14 +263,17 @@ export async function executeBookingTool(
             availableAlternatives: alternatives.filter(
               (event) => event.bookedCustomers < event.capacity,
             ),
-            targetEventName: eventName,
+            targetEventName,
           },
           intent: "booking_change_lookup",
         };
       }
 
       case "check_booking_guest_capacity": {
-        const additionalGuests = Number(args["additionalGuests"]);
+        const rawAdditionalGuests = Number(args["additionalGuests"]);
+        const additionalGuests = Number.isFinite(rawAdditionalGuests)
+          ? rawAdditionalGuests
+          : 1;
         const booking = await getUserBookingDetails(userId);
 
         if (!booking?.event) {

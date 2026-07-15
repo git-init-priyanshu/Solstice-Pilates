@@ -80,18 +80,34 @@ export async function executeEventTool(
       }
 
       case "update_event_record": {
-        const eventId = args["eventId"] as string;
+        const eventId = args["eventId"];
+        if (typeof eventId !== "string" || eventId.trim() === "") {
+          throw new Error("An eventId is required.");
+        }
 
         const existingEvent = await findEventById(eventId);
         if (!existingEvent) {
           throw new Error("The selected event could not be found.");
         }
 
+        const name = args["name"];
+        const startTime = args["startTime"];
+        const endTime = args["endTime"];
+
         const updatedEvent: EventRecord = {
           ...existingEvent,
-          name: args["name"] ?? existingEvent.name,
-          startTime: args["startTime"] ?? existingEvent.startTime,
-          endTime: args["endTime"] ?? existingEvent.endTime,
+          name:
+            typeof name === "string" && name.trim() !== ""
+              ? name
+              : existingEvent.name,
+          startTime:
+            typeof startTime === "string" && startTime.trim() !== ""
+              ? startTime
+              : existingEvent.startTime,
+          endTime:
+            typeof endTime === "string" && endTime.trim() !== ""
+              ? endTime
+              : existingEvent.endTime,
           pricingPerHour: Number(
             args["pricingPerHour"] ?? existingEvent.pricingPerHour,
           ),

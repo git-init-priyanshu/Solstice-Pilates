@@ -157,7 +157,11 @@ export function useDatabase() {
     capacity,
     bookedCustomers = 0,
   }: EventRecordInput): Promise<EventRecord> {
-    if (endTime <= startTime) {
+    if (Number.isNaN(Date.parse(startTime)) || Number.isNaN(Date.parse(endTime))) {
+      throw new Error("startTime and endTime must be valid date-times.");
+    }
+
+    if (Date.parse(endTime) <= Date.parse(startTime)) {
       throw new Error("endTime must be after startTime.");
     }
 
@@ -213,7 +217,14 @@ export function useDatabase() {
       throw new Error("The event could not be found.");
     }
 
-    if (event.endTime <= event.startTime) {
+    if (
+      Number.isNaN(Date.parse(event.startTime)) ||
+      Number.isNaN(Date.parse(event.endTime))
+    ) {
+      throw new Error("startTime and endTime must be valid date-times.");
+    }
+
+    if (Date.parse(event.endTime) <= Date.parse(event.startTime)) {
       throw new Error("endTime must be after startTime.");
     }
 

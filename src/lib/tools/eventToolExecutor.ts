@@ -216,10 +216,7 @@ export async function executeEventTool(
             : toolCall.function.name === "list_events_in_range"
               ? "event_lookup"
               : undefined,
-      message:
-        error instanceof Error && error.message
-          ? error.message
-          : "Event tool failed",
+      message: error instanceof Error ? error.message : "Event tool failed",
     };
   }
 }

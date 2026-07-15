@@ -53,3 +53,8 @@ export type LLMReplyInput = {
   userId: string;
   userProfile: Pick<UserProfile, "email" | "name" | "phone">;
 };
+
+export type LLMReplyResult = {
+  chatId?: string;
+  reply: string | null;
+};

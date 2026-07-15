@@ -181,7 +181,7 @@ export async function executeEventTool(
           message: `Unknown event tool: ${toolCall.function.name}`,
         };
     }
-  } catch {
+  } catch (error) {
     return {
       ok: false,
       intent:
@@ -192,7 +192,7 @@ export async function executeEventTool(
             : toolCall.function.name === "list_events_in_range"
               ? "event_lookup"
               : undefined,
-      message: "Event tool failed",
+      message: error instanceof Error ? error.message : "Event tool failed",
     };
   }
 }

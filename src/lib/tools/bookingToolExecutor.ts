@@ -349,7 +349,7 @@ export async function executeBookingTool(
           message: `Unknown booking tool: ${toolCall.function.name}`,
         };
     }
-  } catch {
+  } catch (error) {
     return {
       ok: false,
       intent:
@@ -368,7 +368,7 @@ export async function executeBookingTool(
                     : toolCall.function.name === "request_human_handoff"
                       ? "human_handoff"
                       : undefined,
-      message: "Booking tool failed",
+      message: error instanceof Error ? error.message : "Booking tool failed",
     };
   }
 }

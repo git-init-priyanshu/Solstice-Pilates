@@ -4,7 +4,7 @@ import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 import type { VapiRoutePayload } from "@/types/vapi.types";
 
-const { upsertChatSession, upsertUserProfile } = sheetApi();
+const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
 
 export async function POST(request: Request) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
@@ -36,11 +36,23 @@ export async function POST(request: Request) {
       string,
       unknown
     >;
-    const chatId = String(variableValues.chatId || crypto.randomUUID());
+    let chatId = String(variableValues.chatId || crypto.randomUUID());
     const userId = String(variableValues.userId || "");
     const name = String(variableValues.name || "");
     const email = String(variableValues.email || "");
     const phone = String(variableValues.phone || "");
+
+    if (userId) {
+      const existingChat = await findChatById(chatId);
+
+      if (
+        existingChat &&
+        existingChat.userId &&
+        existingChat.userId !== userId
+      ) {
+        chatId = crypto.randomUUID();
+      }
+    }
 
     // Execute tools
     if (message.type === "tool-calls") {

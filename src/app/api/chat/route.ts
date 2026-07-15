@@ -14,7 +14,7 @@ import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 import type { ChatRequestBody } from "@/types/chat.types";
 
-const { upsertChatSession, upsertUserProfile } = sheetApi();
+const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
 
 export async function POST(request: Request) {
   try {
@@ -27,6 +27,18 @@ export async function POST(request: Request) {
       chatId: body.chatId ?? crypto.randomUUID(),
       userId: body.userId,
     };
+
+    if (body.chatId) {
+      const existingChat = await findChatById(body.chatId);
+
+      if (
+        existingChat &&
+        existingChat.userId &&
+        existingChat.userId !== body.userId
+      ) {
+        toolContext.chatId = crypto.randomUUID();
+      }
+    }
 
     const session = body.userId
       ? await upsertUserProfile({
@@ -78,7 +90,7 @@ export async function POST(request: Request) {
     }
 
     const openAiClient = createOpenAIClient();
-    let bookingStatus = "";
+    let bookingStatus: string | undefined;
     let lastIntent = "chat";
     const knownUserContext = createKnownUserContext(body.userProfile);
     const conversationMemory: ChatCompletionMessageParam[] = [
@@ -143,7 +155,10 @@ export async function POST(request: Request) {
             : await executeBookingTool(toolCall, toolContext);
 
         lastIntent = result.intent ?? "";
-        bookingStatus = result.bookingStatus ?? "";
+
+        if (result.bookingStatus) {
+          bookingStatus = result.bookingStatus;
+        }
 
         if (toolContext.userId && result.userProfile) {
           await upsertUserProfile({

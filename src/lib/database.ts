@@ -375,7 +375,7 @@ export function useDatabase() {
         bookingStatus: bookingStatus ?? user.bookingStatus,
         bookedEventId: bookedEventId ?? user.bookedEventId,
         lastChatSessionId: chat.id,
-        role: role ?? user.role,
+        role: user.role === "admin" ? "admin" : (role ?? user.role),
       },
     });
 

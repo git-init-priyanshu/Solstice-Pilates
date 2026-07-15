@@ -1,4 +1,4 @@
-import type { Chat, Event, User } from "@prisma/client";
+import type { Chat, Event, Prisma, User } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import type {
@@ -232,8 +232,12 @@ export function useDatabase() {
     return toEventRecord(updatedEvent);
   }
 
-  async function adjustEventBookedCustomers(eventId: string, change: number) {
-    const event = await findEventById(eventId);
+  async function adjustEventBookedCustomers(
+    eventId: string,
+    change: number,
+    client: typeof prisma | Prisma.TransactionClient = prisma,
+  ) {
+    const event = await client.event.findUnique({ where: { id: eventId } });
 
     if (!event) {
       throw new Error("The event could not be found.");
@@ -260,13 +264,15 @@ export function useDatabase() {
       );
     }
 
-    const updatedEvent = await findEventById(eventId);
+    const updatedEvent = await client.event.findUnique({
+      where: { id: eventId },
+    });
 
     if (!updatedEvent) {
       throw new Error("The event could not be found.");
     }
 
-    return updatedEvent;
+    return toEventRecord(updatedEvent);
   }
 
   async function createChatSession({

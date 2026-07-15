@@ -7,13 +7,12 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
-    const role = searchParams.get("role") === "admin" ? "admin" : "user";
 
     if (!userId) {
       return Response.json({ message: "userId is required." }, { status: 400 });
     }
 
-    const { chat, user } = await upsertUserProfile({ role, userId });
+    const { chat, user } = await upsertUserProfile({ role: "user", userId });
 
     return Response.json({
       user,

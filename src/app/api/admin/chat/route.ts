@@ -9,6 +9,7 @@ import {
 } from "@/lib/chat/chatHelpers";
 import { adminEventTools } from "@/lib/tools/event";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
+import { isAdminUser, isAllowlistedAdmin } from "@/lib/adminAuth";
 import type { ChatRequestBody } from "@/types/chat.types";
 
 const { upsertChatSession, upsertUserProfile } = sheetApi();
@@ -32,13 +33,18 @@ export async function POST(request: Request) {
       userId: body.userId,
     };
 
-    if (toolContext.userId) {
-      await upsertUserProfile({
-        lastChatSessionId: toolContext.chatId,
-        role: "admin",
-        userId: toolContext.userId,
-      });
+    if (!toolContext.userId || !(await isAdminUser(toolContext.userId))) {
+      return Response.json(
+        { message: "Admin access is required." },
+        { status: 403 },
+      );
     }
+
+    await upsertUserProfile({
+      lastChatSessionId: toolContext.chatId,
+      role: isAllowlistedAdmin(toolContext.userId) ? "admin" : "user",
+      userId: toolContext.userId,
+    });
 
     const client = createOpenAIClient();
     let lastIntent = "admin_chat";

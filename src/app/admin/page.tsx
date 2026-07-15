@@ -41,9 +41,11 @@ export default function AdminPage() {
         return;
       }
 
-      await fetch(`/api/chat/session?userId=${adminUserId}&role=admin`);
+      await fetch(`/api/chat/session?userId=${adminUserId}`);
 
-      const response = await fetch("/api/admin/handoffs");
+      const response = await fetch(
+        `/api/admin/handoffs?adminUserId=${adminUserId}`,
+      );
       const payload = await response.json();
 
       if (!response.ok) {
@@ -79,7 +81,9 @@ export default function AdminPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/admin/handoffs");
+      const response = await fetch(
+        `/api/admin/handoffs?adminUserId=${adminUserId}`,
+      );
       const payload = await response.json();
 
       if (!response.ok) {

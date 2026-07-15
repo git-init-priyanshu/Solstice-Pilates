@@ -92,15 +92,21 @@ export async function executeBookingTool(
 
         const bookingUserId = isGuestBooking ? crypto.randomUUID() : userId;
         const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
-        const session = await upsertUserProfile({
-          userId: bookingUserId,
-          bookedEventId: event.eventId,
-          bookingStatus: "booked",
-          lastChatSessionId: toolContext.chatId,
-          name: customerName,
-          email: customerEmail,
-          phone: customerPhone,
-        });
+        let session;
+        try {
+          session = await upsertUserProfile({
+            userId: bookingUserId,
+            bookedEventId: event.eventId,
+            bookingStatus: "booked",
+            lastChatSessionId: toolContext.chatId,
+            name: customerName,
+            email: customerEmail,
+            phone: customerPhone,
+          });
+        } catch (error) {
+          await adjustEventBookedCustomers(event.eventId, -1);
+          throw error;
+        }
 
         return {
           ok: true,
@@ -160,14 +166,28 @@ export async function executeBookingTool(
         const previousEvent = await findEventById(previousBookedEventId);
 
         await adjustEventBookedCustomers(previousBookedEventId, -1);
-        const updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
 
-        const session = await upsertUserProfile({
-          userId,
-          bookedEventId: event.eventId,
-          bookingStatus: "booked",
-          lastChatSessionId: toolContext.chatId,
-        });
+        let updatedEvent;
+        try {
+          updatedEvent = await adjustEventBookedCustomers(event.eventId, 1);
+        } catch (error) {
+          await adjustEventBookedCustomers(previousBookedEventId, 1);
+          throw error;
+        }
+
+        let session;
+        try {
+          session = await upsertUserProfile({
+            userId,
+            bookedEventId: event.eventId,
+            bookingStatus: "booked",
+            lastChatSessionId: toolContext.chatId,
+          });
+        } catch (error) {
+          await adjustEventBookedCustomers(event.eventId, -1);
+          await adjustEventBookedCustomers(previousBookedEventId, 1);
+          throw error;
+        }
 
         return {
           ok: true,
@@ -180,6 +200,51 @@ export async function executeBookingTool(
             user: session.user,
           },
           intent: "booking_change",
+        };
+      }
+
+      case "cancel_user_booking": {
+        const confirmedByCustomer = args["confirmedByCustomer"] === true;
+
+        if (!confirmedByCustomer) {
+          throw new Error(
+            "Customer must explicitly confirm before cancelling the booking.",
+          );
+        }
+
+        const existingUser = await findUserById(userId);
+        const bookedEventId =
+          existingUser?.bookingStatus === "booked"
+            ? existingUser.bookedEventId
+            : "";
+        if (!bookedEventId) {
+          throw new Error(
+            "The user does not have a current event booking to cancel.",
+          );
+        }
+
+        const updatedEvent = await adjustEventBookedCustomers(
+          bookedEventId,
+          -1,
+        );
+
+        const session = await upsertUserProfile({
+          userId,
+          bookedEventId: "",
+          bookingStatus: "",
+          lastChatSessionId: toolContext.chatId,
+        });
+
+        return {
+          ok: true,
+          message: "cancel_user_booking completed",
+          bookingStatus: session.user.bookingStatus,
+          data: {
+            bookingStatus: session.user.bookingStatus,
+            event: updatedEvent,
+            user: session.user,
+          },
+          intent: "booking_cancel",
         };
       }
 
@@ -216,8 +281,17 @@ export async function executeBookingTool(
           );
         }
 
+        const targetEventName =
+          typeof eventName === "string" && eventName.trim()
+            ? eventName.trim()
+            : booking.event.name;
+
         const allEvents = await listEventsInRange({ startTime, endTime });
         const alternatives = allEvents
+          .filter(
+            (event) =>
+              event.name.toLowerCase() === targetEventName.toLowerCase(),
+          )
           .filter((event) => event.eventId !== booking.event?.eventId)
           .map((event) => ({
             ...event,
@@ -234,14 +308,17 @@ export async function executeBookingTool(
             availableAlternatives: alternatives.filter(
               (event) => event.bookedCustomers < event.capacity,
             ),
-            targetEventName: eventName,
+            targetEventName,
           },
           intent: "booking_change_lookup",
         };
       }
 
       case "check_booking_guest_capacity": {
-        const additionalGuests = Number(args["additionalGuests"]);
+        const rawAdditionalGuests = Number(args["additionalGuests"]);
+        const additionalGuests = Number.isFinite(rawAdditionalGuests)
+          ? rawAdditionalGuests
+          : 1;
         const booking = await getUserBookingDetails(userId);
 
         if (!booking?.event) {
@@ -280,15 +357,17 @@ export async function executeBookingTool(
           ? "booking"
           : toolCall.function.name === "change_user_booking"
             ? "booking_change"
-            : toolCall.function.name === "get_user_booking_status"
-              ? "booking_status"
-              : toolCall.function.name === "find_alternative_event_options"
-                ? "booking_change_lookup"
-                : toolCall.function.name === "check_booking_guest_capacity"
-                  ? "booking_guest_capacity"
-                  : toolCall.function.name === "request_human_handoff"
-                    ? "human_handoff"
-                    : undefined,
+            : toolCall.function.name === "cancel_user_booking"
+              ? "booking_cancel"
+              : toolCall.function.name === "get_user_booking_status"
+                ? "booking_status"
+                : toolCall.function.name === "find_alternative_event_options"
+                  ? "booking_change_lookup"
+                  : toolCall.function.name === "check_booking_guest_capacity"
+                    ? "booking_guest_capacity"
+                    : toolCall.function.name === "request_human_handoff"
+                      ? "human_handoff"
+                      : undefined,
       message: error instanceof Error ? error.message : "Booking tool failed",
     };
   }

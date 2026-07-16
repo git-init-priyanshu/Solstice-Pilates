@@ -1,17 +1,23 @@
 import type { OpenAIChatMessage } from "@/types/openai.types";
 
 import { useDatabase as sheetApi } from "@/lib/database";
+import { isAdminUser } from "@/lib/adminAuth";
 
-const {
-  findChatById,
-  findUserById,
-  listHandoffChats,
-  upsertChatSession,
-  upsertUserProfile,
-} = sheetApi();
+const { findChatById, findUserById, listHandoffChats, upsertChatSession } =
+  sheetApi();
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const adminUserId = searchParams.get("adminUserId") || "";
+
+    if (!(await isAdminUser(adminUserId))) {
+      return Response.json(
+        { message: "Admin access is required." },
+        { status: 403 },
+      );
+    }
+
     const chats = await listHandoffChats();
 
     return Response.json({
@@ -49,11 +55,11 @@ export async function POST(request: Request) {
       );
     }
 
-    if (body.adminUserId) {
-      await upsertUserProfile({
-        role: "admin",
-        userId: body.adminUserId,
-      });
+    if (!(await isAdminUser(body.adminUserId || ""))) {
+      return Response.json(
+        { message: "Admin access is required." },
+        { status: 403 },
+      );
     }
 
     const user = await findUserById(body.userId);

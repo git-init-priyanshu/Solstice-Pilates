@@ -35,6 +35,7 @@ export function useChat({
     phone: "",
   });
   const [userId, setUserId] = useState("");
+  const [isHandoff, setIsHandoff] = useState(false);
   const storageKey = userIdStorageKey || "solstice_pilates_user_id";
 
   useEffect(() => {
@@ -66,6 +67,7 @@ export function useChat({
         const session = payload as ChatSessionInit;
 
         setChatId(session.chat.id);
+        setIsHandoff(session.chat.lastIntent === "human_handoff");
         setMessages(
           session.messages.map<ChatMessage>((message) => ({
             id: crypto.randomUUID(),
@@ -87,6 +89,41 @@ export function useChat({
 
     loadSession();
   }, [role, sessionApiPath, storageKey]);
+
+  useEffect(() => {
+    if (!isHandoff || !userId) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${sessionApiPath}?userId=${userId}`);
+        const payload = await response.json();
+
+        if (!response.ok) {
+          return;
+        }
+
+        const session = payload as ChatSessionInit;
+
+        setIsHandoff(session.chat.lastIntent === "human_handoff");
+
+        if (session.messages.length > messages.length) {
+          setMessages(
+            session.messages.map<ChatMessage>((message) => ({
+              id: crypto.randomUUID(),
+              sender: message.role === "user" ? "User" : "LLM",
+              text: message.content,
+            })),
+          );
+        }
+      } catch {
+        // Keep polling; transient failures are non-fatal.
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isHandoff, userId, sessionApiPath, messages.length]);
 
   async function submitChatMessage() {
     const trimmedInput = chatInput.trim();
@@ -134,6 +171,8 @@ export function useChat({
             time: getCurrentTime(),
           },
         ]);
+      } else {
+        setIsHandoff(true);
       }
     } catch {
       setMessages((currentMessages) => [

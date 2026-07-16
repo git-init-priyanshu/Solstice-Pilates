@@ -20,7 +20,9 @@ export async function POST(request: Request) {
   try {
     const body: ChatRequestBody = await request.json();
     const clientMessages = body.messages?.filter(
-      (message) => message.role === "user" || message.role === "assistant",
+      (message) =>
+        (message.role === "user" || message.role === "assistant") &&
+        typeof message.content === "string",
     ) ?? [];
 
     const toolContext = {
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
     const isExistingHandoff = session?.chat.lastIntent === "human_handoff";
     const shouldHandoff =
       isExistingHandoff ||
-      /(refund|billing|charged|charge|wrong price|price issue|price complaint|complaint|complain|manager|human|admin|birthday|party|private event|celebration)/.test(
+      /\b(refund|billing|charged|charge|wrong price|price issue|price complaint|complaint|complain|manager|human|admin|birthday|party|private event|celebration)\b/.test(
         latestUserMessage?.content.toLowerCase() || "",
       );
 

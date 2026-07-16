@@ -330,8 +330,11 @@ export async function executeBookingTool(
       case "check_booking_guest_capacity": {
         const rawAdditionalGuests = Number(args["additionalGuests"]);
         const additionalGuests = Number.isFinite(rawAdditionalGuests)
-          ? rawAdditionalGuests
+          ? Math.floor(rawAdditionalGuests)
           : 1;
+        if (additionalGuests < 1) {
+          throw new Error("additionalGuests must be a positive whole number.");
+        }
         const booking = await getUserBookingDetails(userId);
 
         if (!booking?.event) {

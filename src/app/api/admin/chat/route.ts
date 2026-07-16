@@ -18,7 +18,9 @@ export async function POST(request: Request) {
   try {
     const body: ChatRequestBody = await request.json();
     const messages = body.messages?.filter(
-      (message) => message.role === "user" || message.role === "assistant",
+      (message) =>
+        (message.role === "user" || message.role === "assistant") &&
+        typeof message.content === "string",
     ) ?? [];
 
     if (!messages.length) {

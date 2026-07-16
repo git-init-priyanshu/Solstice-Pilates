@@ -247,6 +247,14 @@ export function useDatabase() {
     return toEventRecord(updatedEvent);
   }
 
+  async function deleteEventRecord(eventId: string) {
+    const deletedEvent = await prisma.event.delete({
+      where: { id: eventId },
+    });
+
+    return toEventRecord(deletedEvent);
+  }
+
   async function adjustEventBookedCustomers(
     eventId: string,
     change: number,
@@ -437,6 +445,7 @@ export function useDatabase() {
   return {
     adjustEventBookedCustomers,
     createEventRecord,
+    deleteEventRecord,
     findEventById,
     findEventByName,
     findChatById,

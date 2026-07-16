@@ -107,5 +107,29 @@ export const adminEventTools: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "delete_event_record",
+      description:
+        "Delete an existing studio event from Google Calendar and the Event sheet after the admin identifies the event and explicitly confirms the deletion. Only allowed when the event has no active bookings.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          eventId: {
+            type: "string",
+            description: "Existing Event sheet event_id for the event.",
+          },
+          confirmedByAdmin: {
+            type: "boolean",
+            description:
+              "True only if the admin explicitly confirmed the deletion.",
+          },
+        },
+        required: ["eventId", "confirmedByAdmin"],
+      },
+    },
+  },
   ...eventLookupTools,
 ];

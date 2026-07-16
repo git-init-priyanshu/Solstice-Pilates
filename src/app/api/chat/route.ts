@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         userId: toolContext.userId || "",
       });
 
-      return Response.json({ reply });
+      return Response.json({ reply, chatId: toolContext.chatId });
     }
 
     const openAiClient = createOpenAIClient();
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
           userId: toolContext.userId || "",
         });
 
-        return Response.json({ reply });
+        return Response.json({ reply, chatId: toolContext.chatId });
       }
 
       conversationMemory.push({

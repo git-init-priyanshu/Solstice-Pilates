@@ -1,4 +1,4 @@
-import type { LLMReplyInput } from "@/types/chat.types";
+import type { LLMReplyInput, LLMReplyResult } from "@/types/chat.types";
 
 export function useOpenAi() {
   async function getLLMReply({
@@ -7,7 +7,7 @@ export function useOpenAi() {
     messages,
     userId,
     userProfile,
-  }: LLMReplyInput) {
+  }: LLMReplyInput): Promise<LLMReplyResult> {
     const response = await fetch(apiPath, {
       method: "POST",
       headers: {
@@ -22,7 +22,7 @@ export function useOpenAi() {
       throw new Error(payload.message || "Unable to reach the assistant.");
     }
 
-    return payload.reply ?? null;
+    return { reply: payload.reply ?? null, chatId: payload.chatId };
   }
 
   return {

@@ -112,13 +112,17 @@ export function useChat({
         role: message.sender === "User" ? "user" : "assistant",
         content: message.text,
       }));
-      const reply = await getLLMReply({
+      const { reply, chatId: serverChatId } = await getLLMReply({
         apiPath,
         chatId,
         messages: modelMessages,
         userId,
         userProfile: profile,
       });
+
+      if (serverChatId && serverChatId !== chatId) {
+        setChatId(serverChatId);
+      }
 
       if (reply) {
         setMessages((currentMessages) => [

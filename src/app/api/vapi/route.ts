@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const email = String(variableValues.email || "");
     const phone = String(variableValues.phone || "");
 
-    if (userId) {
+    if (variableValues.chatId) {
       const existingChat = await findChatById(chatId);
 
       if (

@@ -257,7 +257,7 @@ export function useDatabase() {
       throw new Error("bookedCustomers cannot go below zero.");
     }
 
-    const { count } = await prisma.event.updateMany({
+    const { count } = await client.event.updateMany({
       where: { id: eventId, bookedCustomers: event.bookedCustomers },
       data: { bookedCustomers: nextBookedCustomers },
     });

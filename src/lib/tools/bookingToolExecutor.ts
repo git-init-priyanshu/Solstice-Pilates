@@ -120,6 +120,9 @@ export async function executeBookingTool(
           });
         } catch (error) {
           await adjustEventBookedCustomers(event.eventId, -1);
+          if (previousBookedEventId) {
+            await adjustEventBookedCustomers(previousBookedEventId, 1);
+          }
           throw error;
         }
 

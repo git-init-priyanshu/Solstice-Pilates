@@ -63,7 +63,10 @@ export function createKnownUserContext(
 }
 
 export function createCurrentDateContext() {
-  const timeZone = process.env.GOOGLE_TIME_ZONE || "UTC";
+  const timeZone =
+    process.env.GOOGLE_TIME_ZONE ||
+    process.env.NEXT_PUBLIC_GOOGLE_TIME_ZONE ||
+    "UTC";
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",

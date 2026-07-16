@@ -80,9 +80,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const messages = chat.conversation
-      ? (JSON.parse(chat.conversation) as OpenAIChatMessage[])
-      : [];
+    if (chat.userId && chat.userId !== user.userId) {
+      return Response.json(
+        { message: "The target user chat was not found." },
+        { status: 404 },
+      );
+    }
+
+    if (chat.lastIntent !== "human_handoff") {
+      return Response.json(
+        { message: "The target user chat is not in human handoff." },
+        { status: 409 },
+      );
+    }
+
+    let messages: OpenAIChatMessage[] = [];
+    if (chat.conversation) {
+      try {
+        messages = JSON.parse(chat.conversation) as OpenAIChatMessage[];
+      } catch {
+        messages = [];
+      }
+    }
 
     await upsertChatSession({
       bookingStatus: chat.bookingStatus,
@@ -95,7 +114,7 @@ export async function POST(request: Request) {
         },
       ]),
       lastIntent: "human_handoff",
-      userId: user.userId,
+      userId: chat.userId || user.userId,
     });
 
     return Response.json({ ok: true });

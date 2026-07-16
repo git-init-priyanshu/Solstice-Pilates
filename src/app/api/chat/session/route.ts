@@ -13,6 +13,15 @@ export async function GET(request: Request) {
       return Response.json({ message: "userId is required." }, { status: 400 });
     }
 
+    if (role === "admin") {
+      const secret = process.env.ADMIN_API_SECRET;
+      const authorization = request.headers.get("authorization");
+
+      if (secret && authorization !== `Bearer ${secret}`) {
+        return Response.json({ message: "Unauthorized." }, { status: 401 });
+      }
+    }
+
     const { chat, user } = await upsertUserProfile({ role, userId });
 
     return Response.json({

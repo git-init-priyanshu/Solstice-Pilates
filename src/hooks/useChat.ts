@@ -54,8 +54,15 @@ export function useChat({
       setUserId(existingUserId);
 
       try {
+        const adminSecret = process.env.NEXT_PUBLIC_ADMIN_API_SECRET;
         const response = await fetch(
           `${sessionApiPath}?userId=${existingUserId}&role=${role}`,
+          {
+            headers:
+              role === "admin" && adminSecret
+                ? { Authorization: `Bearer ${adminSecret}` }
+                : {},
+          },
         );
         const payload = await response.json();
 
@@ -116,6 +123,7 @@ export function useChat({
         apiPath,
         chatId,
         messages: modelMessages,
+        role,
         userId,
         userProfile: profile,
       });

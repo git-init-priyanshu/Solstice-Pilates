@@ -13,7 +13,18 @@ import type { ChatRequestBody } from "@/types/chat.types";
 
 const { upsertChatSession, upsertUserProfile } = sheetApi();
 
+function isAuthorizedAdmin(request: Request) {
+  const secret = process.env.ADMIN_API_SECRET;
+  const authorization = request.headers.get("authorization");
+
+  return !secret || authorization === `Bearer ${secret}`;
+}
+
 export async function POST(request: Request) {
+  if (!isAuthorizedAdmin(request)) {
+    return Response.json({ message: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const body: ChatRequestBody = await request.json();
     const messages = body.messages?.filter(

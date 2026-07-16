@@ -72,6 +72,39 @@ export default function AdminPage() {
       });
   }, [adminUserId]);
 
+  useEffect(() => {
+    if (!adminUserId) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/handoffs?adminUserId=${adminUserId}`,
+        );
+        const payload = await response.json();
+
+        if (!response.ok) {
+          return;
+        }
+
+        const nextChats = (payload.chats ?? []) as HandoffChat[];
+
+        setChats(nextChats);
+        setSelectedChatId((currentChatId) =>
+          currentChatId === "assistant" ||
+          nextChats.some((chat) => chat.user.userId === currentChatId)
+            ? currentChatId
+            : "assistant",
+        );
+      } catch {
+        // Keep polling on transient errors.
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [adminUserId]);
+
   const selectedHandoffChat =
     selectedChatId === "assistant"
       ? null

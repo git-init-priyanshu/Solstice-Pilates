@@ -127,3 +127,56 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = (await request.json()) as {
+      adminUserId?: string;
+      userId?: string;
+    };
+
+    if (!body.userId) {
+      return Response.json({ message: "userId is required." }, { status: 400 });
+    }
+
+    if (!(await isAdminUser(body.adminUserId || ""))) {
+      return Response.json(
+        { message: "Admin access is required." },
+        { status: 403 },
+      );
+    }
+
+    const user = await findUserById(body.userId);
+
+    if (!user?.lastChatSessionId) {
+      return Response.json(
+        { message: "The target user chat was not found." },
+        { status: 404 },
+      );
+    }
+
+    const chat = await findChatById(user.lastChatSessionId);
+
+    if (!chat) {
+      return Response.json(
+        { message: "The target user chat was not found." },
+        { status: 404 },
+      );
+    }
+
+    await upsertChatSession({
+      chatId: chat.id,
+      lastIntent: "chat",
+      userId: user.userId,
+    });
+
+    return Response.json({ ok: true });
+  } catch {
+    return Response.json(
+      {
+        message: "Unable to resolve the handoff.",
+      },
+      { status: 500 },
+    );
+  }
+}

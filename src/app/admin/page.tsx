@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [chats, setChats] = useState<HandoffChat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
   const [reply, setReply] = useState("");
   const [selectedChatId, setSelectedChatId] = useState("assistant");
 
@@ -155,6 +156,41 @@ export default function AdminPage() {
     }
   }
 
+  async function resolveHandoff() {
+    if (!selectedHandoffChat || !adminUserId || isResolving) {
+      return;
+    }
+
+    setIsResolving(true);
+
+    try {
+      const response = await fetch("/api/admin/handoffs", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminUserId,
+          userId: selectedHandoffChat.user.userId,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to resolve the handoff.");
+      }
+
+      setChats((currentChats) =>
+        currentChats.filter(
+          (chat) => chat.user.userId !== selectedHandoffChat.user.userId,
+        ),
+      );
+      setSelectedChatId("assistant");
+    } finally {
+      setIsResolving(false);
+    }
+  }
+
   return (
     <main className="h-svh overflow-hidden bg-background p-4 text-foreground md:p-8">
       <section className="mx-auto flex h-full max-w-6xl overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -254,10 +290,25 @@ export default function AdminPage() {
                 title={selectedHandoffChat?.user.name || "Human handoff"}
               />
 
-              <div className="border-b border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-                {selectedHandoffChat
-                  ? `Reply here to continue ${selectedHandoffChat.user.name || "this user's"} conversation.`
-                  : "Choose a handoff chat to reply."}
+              <div className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+                <span>
+                  {selectedHandoffChat
+                    ? `Reply here to continue ${selectedHandoffChat.user.name || "this user's"} conversation.`
+                    : "Choose a handoff chat to reply."}
+                </span>
+                {selectedHandoffChat ? (
+                  <Button
+                    disabled={isResolving}
+                    onClick={resolveHandoff}
+                    type="button"
+                    variant="outline"
+                  >
+                    {isResolving ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : null}
+                    Resolve
+                  </Button>
+                ) : null}
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 px-4 py-5">

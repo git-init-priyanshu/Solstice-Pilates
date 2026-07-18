@@ -143,6 +143,12 @@ export async function executeEventTool(
           }
         }
 
+        if (updatedEvent.capacity < existingEvent.bookedCustomers) {
+          throw new Error(
+            "capacity cannot be lower than the current number of booked customers.",
+          );
+        }
+
         const shouldUpdateCalendar =
           updatedEvent.name !== existingEvent.name ||
           updatedEvent.startTime !== existingEvent.startTime ||

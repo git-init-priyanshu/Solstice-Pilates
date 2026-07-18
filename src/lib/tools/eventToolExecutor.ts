@@ -64,14 +64,28 @@ export async function executeEventTool(
         }
 
         // Append event data in sheet
-        const eventRecord = await createEventRecord({
-          eventId: calendarEvent.id,
-          name,
-          startTime,
-          endTime,
-          pricingPerHour,
-          capacity,
-        });
+        let eventRecord;
+        try {
+          eventRecord = await createEventRecord({
+            eventId: calendarEvent.id,
+            name,
+            startTime,
+            endTime,
+            pricingPerHour,
+            capacity,
+          });
+        } catch (error) {
+          try {
+            await cancelCalendarEvent({
+              accessToken,
+              calendarId: "primary",
+              eventId: calendarEvent.id,
+            });
+          } catch {
+            // Ignore cancellation errors; the database write failure is what matters.
+          }
+          throw error;
+        }
 
         return {
           ok: true,

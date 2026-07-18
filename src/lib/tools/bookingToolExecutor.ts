@@ -63,6 +63,18 @@ export async function executeBookingTool(
         const customerName = args["customerName"];
         const customerEmail = args["customerEmail"];
         const customerPhone = args["customerPhone"];
+        if (
+          typeof customerName !== "string" ||
+          !customerName.trim() ||
+          typeof customerEmail !== "string" ||
+          !customerEmail.trim() ||
+          typeof customerPhone !== "string" ||
+          !customerPhone.trim()
+        ) {
+          throw new Error(
+            "customerName, customerEmail, and customerPhone are required to book.",
+          );
+        }
         const event = await resolveEventByName(args);
         const confirmedByCustomer = args["confirmedByCustomer"] === true;
         if (!confirmedByCustomer) {
@@ -328,10 +340,11 @@ export async function executeBookingTool(
       }
 
       case "check_booking_guest_capacity": {
-        const rawAdditionalGuests = Number(args["additionalGuests"]);
-        const additionalGuests = Number.isFinite(rawAdditionalGuests)
-          ? rawAdditionalGuests
-          : 1;
+        const rawAdditionalGuests = Math.floor(Number(args["additionalGuests"]));
+        const additionalGuests =
+          Number.isFinite(rawAdditionalGuests) && rawAdditionalGuests >= 1
+            ? rawAdditionalGuests
+            : 1;
         const booking = await getUserBookingDetails(userId);
 
         if (!booking?.event) {

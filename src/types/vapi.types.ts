@@ -76,8 +76,13 @@ export type VapiWebhookPayload = {
   message?: VapiWebhookMessage;
 };
 
+export type VapiRouteContentPart = {
+  text?: string;
+  type?: string;
+};
+
 export type VapiRouteMessageEntry = {
-  content?: string | null;
+  content?: string | VapiRouteContentPart[] | null;
   role?: string;
 };
 

@@ -181,7 +181,14 @@ export async function POST(request: Request) {
         )
         .map<OpenAIChatMessage>((entry) => ({
           role: entry.role as OpenAIChatMessage["role"],
-          content: String(entry.content || ""),
+          content: Array.isArray(entry.content)
+            ? entry.content
+                .filter((part) => part?.type === "text")
+                .map((part) => part.text)
+                .join("")
+            : typeof entry.content === "string"
+              ? entry.content
+              : "",
         }));
 
       if (userId) {

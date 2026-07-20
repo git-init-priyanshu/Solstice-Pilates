@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [isResolving, setIsResolving] = useState(false);
   const [reply, setReply] = useState("");
   const [selectedChatId, setSelectedChatId] = useState("assistant");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadChats() {
@@ -133,6 +134,13 @@ export default function AdminPage() {
           ? currentChatId
           : "assistant",
       );
+      setError("");
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to load handoff chats.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -184,6 +192,13 @@ export default function AdminPage() {
         ),
       );
       setReply("");
+      setError("");
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to send the admin reply.",
+      );
     } finally {
       setIsSending(false);
     }
@@ -219,6 +234,13 @@ export default function AdminPage() {
         ),
       );
       setSelectedChatId("assistant");
+      setError("");
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to resolve the handoff.",
+      );
     } finally {
       setIsResolving(false);
     }
@@ -247,6 +269,9 @@ export default function AdminPage() {
               )}
               Refresh
             </Button>
+            {error ? (
+              <p className="mt-2 text-sm text-destructive">{error}</p>
+            ) : null}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <button

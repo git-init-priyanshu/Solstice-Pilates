@@ -108,14 +108,23 @@ export function useChat({
 
         setIsHandoff(session.chat.lastIntent === "human_handoff");
 
-        if (session.messages.length > messages.length) {
-          setMessages(
-            session.messages.map<ChatMessage>((message) => ({
-              id: crypto.randomUUID(),
-              sender: message.role === "user" ? "User" : "LLM",
-              text: message.content,
-            })),
+        const serverMessages = session.messages.map<ChatMessage>(
+          (message) => ({
+            id: crypto.randomUUID(),
+            sender: message.role === "user" ? "User" : "LLM",
+            text: message.content,
+          }),
+        );
+        const differs =
+          serverMessages.length !== messages.length ||
+          serverMessages.some(
+            (message, index) =>
+              message.sender !== messages[index].sender ||
+              message.text !== messages[index].text,
           );
+
+        if (differs) {
+          setMessages(serverMessages);
         }
       } catch {
         // Keep polling; transient failures are non-fatal.
@@ -123,7 +132,7 @@ export function useChat({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isHandoff, userId, sessionApiPath, messages.length]);
+  }, [isHandoff, userId, sessionApiPath, messages]);
 
   async function submitChatMessage() {
     const trimmedInput = chatInput.trim();

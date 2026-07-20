@@ -56,11 +56,18 @@ export async function POST(request: Request) {
     const latestUserMessage = [...messages]
       .reverse()
       .find((message) => message.role === "user");
-    const isExistingHandoff = session?.chat.lastIntent === "human_handoff";
+    const storedChat = await findChatById(toolContext.chatId);
+    const isExistingHandoff =
+      session?.chat.lastIntent === "human_handoff" ||
+      storedChat?.lastIntent === "human_handoff";
+    const latestUserContent =
+      typeof latestUserMessage?.content === "string"
+        ? latestUserMessage.content.toLowerCase()
+        : "";
     const shouldHandoff =
       isExistingHandoff ||
       /(refund|billing|charged|charge|wrong price|price issue|price complaint|complaint|complain|manager|human|admin|birthday|party|private event|celebration)/.test(
-        latestUserMessage?.content.toLowerCase() || "",
+        latestUserContent,
       );
 
     if (shouldHandoff) {
@@ -68,20 +75,40 @@ export async function POST(request: Request) {
         ? null
         : "I've shared this with the studio admin. They will reply here soon.";
 
+      let storedMessages: Array<{ role: string; content: string }> = [];
+      try {
+        storedMessages = storedChat?.conversation
+          ? JSON.parse(storedChat.conversation)
+          : [];
+      } catch {
+        storedMessages = [];
+      }
+      if (!Array.isArray(storedMessages)) {
+        storedMessages = [];
+      }
+
+      const conversation = [...storedMessages];
+      const lastStored = conversation[conversation.length - 1];
+
+      if (
+        latestUserMessage &&
+        !(
+          lastStored &&
+          lastStored.role === latestUserMessage.role &&
+          lastStored.content === latestUserMessage.content
+        )
+      ) {
+        conversation.push(latestUserMessage);
+      }
+
+      if (reply) {
+        conversation.push({ role: "assistant", content: reply });
+      }
+
       await upsertChatSession({
         bookingStatus: session?.chat.bookingStatus ?? "",
         chatId: toolContext.chatId,
-        conversation: JSON.stringify(
-          reply
-            ? [
-                ...messages,
-                {
-                  role: "assistant",
-                  content: reply,
-                },
-              ]
-            : messages,
-        ),
+        conversation: JSON.stringify(conversation),
         lastIntent: "human_handoff",
         userId: toolContext.userId || "",
       });

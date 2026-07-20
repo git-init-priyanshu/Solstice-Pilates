@@ -241,12 +241,18 @@ export async function executeBookingTool(
           -1,
         );
 
-        const session = await upsertUserProfile({
-          userId,
-          bookedEventId: "",
-          bookingStatus: "",
-          lastChatSessionId: toolContext.chatId,
-        });
+        let session;
+        try {
+          session = await upsertUserProfile({
+            userId,
+            bookedEventId: "",
+            bookingStatus: "",
+            lastChatSessionId: toolContext.chatId,
+          });
+        } catch (error) {
+          await adjustEventBookedCustomers(bookedEventId, 1);
+          throw error;
+        }
 
         return {
           ok: true,

@@ -309,6 +309,13 @@ export default function AdminPage() {
                   <p className="truncate text-xs text-muted-foreground">
                     {chat.user.email || chat.user.phone || chat.user.userId}
                   </p>
+                  {chat.chat.conversationSummary?.startsWith(
+                    "Handoff reason:",
+                  ) ? (
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      {chat.chat.conversationSummary}
+                    </p>
+                  ) : null}
                   <p className="mt-1 truncate text-sm text-muted-foreground">
                     {lastMessage?.content || "No user message yet."}
                   </p>

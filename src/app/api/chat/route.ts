@@ -119,6 +119,7 @@ export async function POST(request: Request) {
     const openAiClient = createOpenAIClient();
     let bookingStatus: string | undefined;
     let lastIntent = "chat";
+    let conversationSummary: string | undefined;
     const knownUserContext = createKnownUserContext(body.userProfile);
     const conversationMemory: ChatCompletionMessageParam[] = [
       {
@@ -158,6 +159,7 @@ export async function POST(request: Request) {
               content: reply,
             },
           ]),
+          ...(conversationSummary ? { conversationSummary } : {}),
           lastIntent,
           userId: toolContext.userId || "",
         });
@@ -182,6 +184,17 @@ export async function POST(request: Request) {
             : await executeBookingTool(toolCall, toolContext);
 
         lastIntent = result.intent ?? "";
+
+        if (
+          result.intent === "human_handoff" &&
+          typeof result.data === "object" &&
+          result.data &&
+          "reason" in result.data &&
+          typeof result.data.reason === "string" &&
+          result.data.reason
+        ) {
+          conversationSummary = `Handoff reason: ${result.data.reason}`;
+        }
 
         if (result.bookingStatus) {
           bookingStatus = result.bookingStatus;

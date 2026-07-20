@@ -141,6 +141,16 @@ export async function POST(request: Request) {
               await upsertChatSession({
                 bookingStatus: result.bookingStatus,
                 chatId,
+                ...(toolName === "request_human_handoff" &&
+                typeof result.data === "object" &&
+                result.data &&
+                "reason" in result.data &&
+                typeof result.data.reason === "string" &&
+                result.data.reason
+                  ? {
+                      conversationSummary: `Handoff reason: ${result.data.reason}`,
+                    }
+                  : {}),
                 lastIntent: result.intent,
                 userId,
               });

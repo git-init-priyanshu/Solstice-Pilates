@@ -228,8 +228,10 @@ export function useDatabase() {
       throw new Error("endTime must be after startTime.");
     }
 
-    if (event.bookedCustomers > event.capacity) {
-      throw new Error("bookedCustomers cannot exceed capacity.");
+    if (event.capacity < storedEvent.bookedCustomers) {
+      throw new Error(
+        "capacity cannot be lower than the current number of booked customers.",
+      );
     }
 
     const updatedEvent = await prisma.event.update({
@@ -240,7 +242,6 @@ export function useDatabase() {
         endTime: event.endTime,
         pricingPerHour: event.pricingPerHour,
         capacity: event.capacity,
-        bookedCustomers: event.bookedCustomers,
       },
     });
 

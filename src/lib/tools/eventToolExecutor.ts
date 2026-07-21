@@ -182,7 +182,27 @@ export async function executeEventTool(
         }
 
         // Update event in sheet
-        const eventRecord = await updateEventRecord(updatedEvent);
+        let eventRecord;
+        try {
+          eventRecord = await updateEventRecord(updatedEvent);
+        } catch (error) {
+          if (updatedCalendarEvent) {
+            try {
+              const rollbackToken = await getGoogleAccessToken();
+              await updateCalendarEvent({
+                accessToken: rollbackToken,
+                calendarId: "primary",
+                eventId,
+                summary: existingEvent.name,
+                startDateTime: existingEvent.startTime,
+                endDateTime: existingEvent.endTime,
+              });
+            } catch {
+              // Ignore rollback errors; the database write failure is what matters.
+            }
+          }
+          throw error;
+        }
 
         return {
           ok: true,

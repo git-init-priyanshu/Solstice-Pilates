@@ -56,5 +56,6 @@ export type LLMReplyInput = {
 
 export type LLMReplyResult = {
   chatId?: string;
+  handoff?: boolean;
   reply: string | null;
 };

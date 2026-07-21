@@ -113,7 +113,7 @@ export async function POST(request: Request) {
         userId: toolContext.userId || "",
       });
 
-      return Response.json({ reply, chatId: toolContext.chatId });
+      return Response.json({ reply, chatId: toolContext.chatId, handoff: true });
     }
 
     const openAiClient = createOpenAIClient();
@@ -164,7 +164,11 @@ export async function POST(request: Request) {
           userId: toolContext.userId || "",
         });
 
-        return Response.json({ reply, chatId: toolContext.chatId });
+        return Response.json({
+          reply,
+          chatId: toolContext.chatId,
+          handoff: lastIntent === "human_handoff",
+        });
       }
 
       conversationMemory.push({

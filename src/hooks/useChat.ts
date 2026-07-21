@@ -158,7 +158,11 @@ export function useChat({
         role: message.sender === "User" ? "user" : "assistant",
         content: message.text,
       }));
-      const { reply, chatId: serverChatId } = await getLLMReply({
+      const {
+        reply,
+        chatId: serverChatId,
+        handoff,
+      } = await getLLMReply({
         apiPath,
         chatId,
         messages: modelMessages,
@@ -168,6 +172,10 @@ export function useChat({
 
       if (serverChatId && serverChatId !== chatId) {
         setChatId(serverChatId);
+      }
+
+      if (handoff || !reply) {
+        setIsHandoff(true);
       }
 
       if (reply) {
@@ -180,8 +188,6 @@ export function useChat({
             time: getCurrentTime(),
           },
         ]);
-      } else {
-        setIsHandoff(true);
       }
     } catch {
       setMessages((currentMessages) => [
@@ -207,6 +213,7 @@ export function useChat({
     chatId,
     chatInput,
     handleChatSubmit,
+    isHandoff,
     isLoading,
     messages,
     profile,

@@ -65,8 +65,9 @@ The UI includes a Vapi web-call integration with start/end controls.
 1. Create a Vapi assistant in the dashboard.
 2. Set `NEXT_PUBLIC_VAPI_PUBLIC_KEY` and `NEXT_PUBLIC_VAPI_ASSISTANT_ID`.
 3. Configure the assistant Server URL to `https://your-app-url/api/vapi`.
-4. If you want webhook authentication, configure the same token in Vapi and
-   `VAPI_WEBHOOK_SECRET`.
+4. Configure the same token in Vapi and `VAPI_WEBHOOK_SECRET`.
+   `VAPI_WEBHOOK_SECRET` is required: the webhook rejects all requests
+   (503) until it is set.
 
 The webhook executes event and booking tools, returns their results to Vapi,
 and persists voice conversation updates in the database.

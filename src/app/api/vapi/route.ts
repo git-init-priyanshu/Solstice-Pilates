@@ -8,14 +8,18 @@ const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
 
 export async function POST(request: Request) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
+
+  if (!secret) {
+    return Response.json(
+      { message: "Vapi webhook secret is not configured." },
+      { status: 503 },
+    );
+  }
+
   const authorization = request.headers.get("authorization");
   const legacySecret = request.headers.get("x-vapi-secret");
 
-  if (
-    secret &&
-    authorization !== `Bearer ${secret}` &&
-    legacySecret !== secret
-  ) {
+  if (authorization !== `Bearer ${secret}` && legacySecret !== secret) {
     return Response.json({ message: "Unauthorized." }, { status: 401 });
   }
 

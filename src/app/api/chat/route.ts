@@ -2,6 +2,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 
 import { useDatabase as sheetApi } from "@/lib/database";
 import { assistantInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
+import { shouldTriggerHandoff, wantsAssistantBack } from "@/lib/chat/handoff";
 import {
   chatModel,
   createCurrentDateContext,
@@ -57,18 +58,27 @@ export async function POST(request: Request) {
       .reverse()
       .find((message) => message.role === "user");
     const storedChat = await findChatById(toolContext.chatId);
-    const isExistingHandoff =
+    const inHandoff =
       session?.chat.lastIntent === "human_handoff" ||
       storedChat?.lastIntent === "human_handoff";
     const latestUserContent =
       typeof latestUserMessage?.content === "string"
-        ? latestUserMessage.content.toLowerCase()
+        ? latestUserMessage.content
         : "";
+    const resumeAssistant = inHandoff && wantsAssistantBack(latestUserContent);
+    const isExistingHandoff = inHandoff && !resumeAssistant;
     const shouldHandoff =
-      isExistingHandoff ||
-      /(refund|billing|charged|charge|wrong price|price issue|price complaint|complaint|complain|manager|human|admin|birthday|party|private event|celebration)/.test(
-        latestUserContent,
-      );
+      isExistingHandoff || shouldTriggerHandoff(latestUserContent);
+
+    if (resumeAssistant) {
+      await upsertChatSession({
+        bookingStatus: session?.chat.bookingStatus ?? "",
+        chatId: toolContext.chatId,
+        conversation: storedChat?.conversation ?? "[]",
+        lastIntent: "chat",
+        userId: toolContext.userId || "",
+      });
+    }
 
     if (shouldHandoff) {
       const reply = isExistingHandoff

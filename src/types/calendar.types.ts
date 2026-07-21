@@ -13,6 +13,7 @@ export type CalendarScheduleInput = {
   endDateTime: string;
   description?: string;
   attendeeEmail?: string;
+  timeZone?: string;
 };
 
 export type CalendarCancelInput = {
@@ -24,6 +25,7 @@ export type CalendarCancelInput = {
 export type CalendarRescheduleInput = CalendarCancelInput & {
   startDateTime: string;
   endDateTime: string;
+  timeZone?: string;
 };
 
 export type CalendarUpdateInput = CalendarCancelInput & {
@@ -31,6 +33,7 @@ export type CalendarUpdateInput = CalendarCancelInput & {
   startDateTime?: string;
   endDateTime?: string;
   description?: string;
+  timeZone?: string;
 };
 
 export type CalendarEventTime = {

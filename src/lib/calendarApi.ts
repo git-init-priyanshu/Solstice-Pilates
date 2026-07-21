@@ -52,6 +52,7 @@ export function scheduleCalendarEvent({
   endDateTime,
   description,
   attendeeEmail,
+  timeZone = process.env.GOOGLE_TIME_ZONE || "UTC",
 }: CalendarScheduleInput) {
   return fetch(
     `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(
@@ -68,11 +69,11 @@ export function scheduleCalendarEvent({
         description,
         start: {
           dateTime: startDateTime,
-          timeZone: "UTC",
+          timeZone,
         },
         end: {
           dateTime: endDateTime,
-          timeZone: "UTC",
+          timeZone,
         },
         attendees: attendeeEmail ? [{ email: attendeeEmail }] : undefined,
       }),
@@ -114,6 +115,7 @@ export function rescheduleCalendarEvent({
   eventId,
   startDateTime,
   endDateTime,
+  timeZone = process.env.GOOGLE_TIME_ZONE || "UTC",
 }: CalendarRescheduleInput) {
   return fetch(
     `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(
@@ -128,11 +130,11 @@ export function rescheduleCalendarEvent({
       body: JSON.stringify({
         start: {
           dateTime: startDateTime,
-          timeZone: "UTC",
+          timeZone,
         },
         end: {
           dateTime: endDateTime,
-          timeZone: "UTC",
+          timeZone,
         },
       }),
     },
@@ -153,6 +155,7 @@ export function updateCalendarEvent({
   startDateTime,
   endDateTime,
   description,
+  timeZone = process.env.GOOGLE_TIME_ZONE || "UTC",
 }: CalendarUpdateInput) {
   return fetch(
     `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(
@@ -170,13 +173,13 @@ export function updateCalendarEvent({
         start: startDateTime
           ? {
               dateTime: startDateTime,
-              timeZone: "UTC",
+              timeZone,
             }
           : undefined,
         end: endDateTime
           ? {
               dateTime: endDateTime,
-              timeZone: "UTC",
+              timeZone,
             }
           : undefined,
       }),

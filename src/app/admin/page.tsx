@@ -66,8 +66,13 @@ export default function AdminPage() {
     }
 
     loadChats()
-      .catch(() => {
+      .catch((caughtError) => {
         setChats([]);
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load handoff chats.",
+        );
       })
       .finally(() => {
         setIsLoading(false);

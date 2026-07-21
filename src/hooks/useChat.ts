@@ -72,7 +72,7 @@ export function useChat({
           session.messages.map<ChatMessage>((message) => ({
             id: crypto.randomUUID(),
             sender: message.role === "user" ? "User" : "LLM",
-            text: message.content,
+            text: message.content ?? "",
           })),
         );
         setProfile({
@@ -112,7 +112,7 @@ export function useChat({
           (message) => ({
             id: crypto.randomUUID(),
             sender: message.role === "user" ? "User" : "LLM",
-            text: message.content,
+            text: message.content ?? "",
           }),
         );
         const differs =

@@ -81,7 +81,7 @@ export async function POST(request: Request) {
             ...messages,
             {
               role: "assistant",
-              content: reply,
+              content: reply ?? "",
             },
           ]),
           lastIntent,

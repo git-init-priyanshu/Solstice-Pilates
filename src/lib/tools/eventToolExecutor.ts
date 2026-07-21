@@ -127,10 +127,20 @@ export async function executeEventTool(
             typeof endTime === "string" && endTime.trim() !== ""
               ? endTime
               : existingEvent.endTime,
-          pricingPerHour: Number(
-            args["pricingPerHour"] ?? existingEvent.pricingPerHour,
-          ),
-          capacity: Number(args["capacity"] ?? existingEvent.capacity),
+          pricingPerHour:
+            typeof args["pricingPerHour"] === "number" ||
+            (typeof args["pricingPerHour"] === "string" &&
+              args["pricingPerHour"].trim() !== "" &&
+              Number.isFinite(Number(args["pricingPerHour"])))
+              ? Number(args["pricingPerHour"])
+              : existingEvent.pricingPerHour,
+          capacity:
+            typeof args["capacity"] === "number" ||
+            (typeof args["capacity"] === "string" &&
+              args["capacity"].trim() !== "" &&
+              Number.isFinite(Number(args["capacity"])))
+              ? Number(args["capacity"])
+              : existingEvent.capacity,
         };
 
         if (

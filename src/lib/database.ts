@@ -73,6 +73,23 @@ export function useDatabase() {
     return event ? toEventRecord(event) : null;
   }
 
+  async function findEventsByName(eventName: string) {
+    const events = await prisma.event.findMany({
+      where: { name: { equals: eventName.trim(), mode: "insensitive" } },
+    });
+    return events.map(toEventRecord);
+  }
+
+  async function findEventByNameAndStart(eventName: string, startTime: string) {
+    const event = await prisma.event.findFirst({
+      where: {
+        name: { equals: eventName.trim(), mode: "insensitive" },
+        startTime,
+      },
+    });
+    return event ? toEventRecord(event) : null;
+  }
+
   async function getUserBookingDetails(userId: string) {
     const user = await findUserById(userId);
 
@@ -449,6 +466,8 @@ export function useDatabase() {
     deleteEventRecord,
     findEventById,
     findEventByName,
+    findEventsByName,
+    findEventByNameAndStart,
     findChatById,
     findUserById,
     getUserBookingDetails,

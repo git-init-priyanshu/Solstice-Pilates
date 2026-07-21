@@ -1,7 +1,8 @@
 import { useDatabase as sheetApi } from "@/lib/database";
 import type { OpenAIChatMessage } from "@/types/openai.types";
+import type { ChatSessionRecord, UserProfile } from "@/types/session.types";
 
-const { upsertUserProfile } = sheetApi();
+const { findUserById, findChatById } = sheetApi();
 
 export async function GET(request: Request) {
   try {
@@ -12,14 +13,46 @@ export async function GET(request: Request) {
       return Response.json({ message: "userId is required." }, { status: 400 });
     }
 
-    const { chat, user } = await upsertUserProfile({ role: "user", userId });
+    const user = await findUserById(userId);
+    const chat = user ? await findChatById(user.lastChatSessionId) : null;
+
+    if (user && chat) {
+      return Response.json({
+        user,
+        chat,
+        messages: chat.conversation
+          ? (JSON.parse(chat.conversation) as OpenAIChatMessage[])
+          : [],
+      });
+    }
+
+    const now = new Date().toISOString();
+    const ephemeralUser: UserProfile = {
+      userId,
+      name: "",
+      email: "",
+      phone: "",
+      bookingStatus: "",
+      bookedEventId: "",
+      lastChatSessionId: "",
+      createdAt: now,
+      role: "user",
+    };
+    const ephemeralChat: ChatSessionRecord = {
+      id: crypto.randomUUID(),
+      userId,
+      conversation: "",
+      conversationSummary: "",
+      lastIntent: "",
+      bookingStatus: "",
+      createdAt: now,
+      updatedAt: now,
+    };
 
     return Response.json({
-      user,
-      chat,
-      messages: chat.conversation
-        ? (JSON.parse(chat.conversation) as OpenAIChatMessage[])
-        : [],
+      user: ephemeralUser,
+      chat: ephemeralChat,
+      messages: [],
     });
   } catch {
     return Response.json(

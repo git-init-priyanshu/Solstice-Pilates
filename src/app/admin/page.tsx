@@ -43,8 +43,6 @@ export default function AdminPage() {
         return;
       }
 
-      await fetch(`/api/chat/session?userId=${adminUserId}`);
-
       const response = await fetch(
         `/api/admin/handoffs?adminUserId=${adminUserId}`,
       );

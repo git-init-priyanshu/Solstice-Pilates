@@ -3,8 +3,13 @@ import type { OpenAIChatMessage } from "@/types/openai.types";
 import { useDatabase as sheetApi } from "@/lib/database";
 import { isAdminUser } from "@/lib/adminAuth";
 
-const { findChatById, findUserById, listHandoffChats, upsertChatSession } =
-  sheetApi();
+const {
+  appendChatMessages,
+  findChatById,
+  findUserById,
+  listHandoffChats,
+  upsertChatSession,
+} = sheetApi();
 
 export async function GET(request: Request) {
   try {
@@ -94,25 +99,10 @@ export async function POST(request: Request) {
       );
     }
 
-    let messages: OpenAIChatMessage[] = [];
-    if (chat.conversation) {
-      try {
-        messages = JSON.parse(chat.conversation) as OpenAIChatMessage[];
-      } catch {
-        messages = [];
-      }
-    }
-
-    await upsertChatSession({
+    await appendChatMessages({
       bookingStatus: chat.bookingStatus,
       chatId: chat.id,
-      conversation: JSON.stringify([
-        ...messages,
-        {
-          role: "assistant",
-          content: reply,
-        },
-      ]),
+      messages: [{ role: "assistant", content: reply }],
       lastIntent: "human_handoff",
       userId: chat.userId || user.userId,
     });

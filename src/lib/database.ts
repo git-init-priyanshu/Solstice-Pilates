@@ -7,7 +7,11 @@ import type {
   EventRecordInput,
 } from "@/types/event.types";
 import type { ChatSessionRecord, UserProfile } from "@/types/session.types";
-import type { ChatSessionInput, UserProfileInput } from "@/types/db.types";
+import type {
+  AppendChatMessagesInput,
+  ChatSessionInput,
+  UserProfileInput,
+} from "@/types/db.types";
 
 function toUserProfile(user: User): UserProfile {
   return {
@@ -443,7 +447,80 @@ export function useDatabase() {
     return toChatSession(updatedChat);
   }
 
+  async function appendChatMessages({
+    chatId,
+    messages,
+    lastIntent,
+    bookingStatus,
+    userId,
+    conversationSummary,
+    dedupeLast = false,
+  }: AppendChatMessagesInput): Promise<ChatSessionRecord> {
+    const updatedChat = await prisma.$transaction(async (tx) => {
+      const existingChat = await tx.chat.findUnique({ where: { id: chatId } });
+
+      if (!existingChat) {
+        const created = await tx.chat.create({
+          data: {
+            id: chatId,
+            userId: userId || "",
+            conversation: JSON.stringify(messages),
+            conversationSummary: conversationSummary ?? "",
+            lastIntent: lastIntent ?? "",
+            bookingStatus: bookingStatus ?? "",
+          },
+        });
+
+        return created;
+      }
+
+      let storedMessages: Array<{ role: string; content: string }> = [];
+      try {
+        storedMessages = existingChat.conversation
+          ? JSON.parse(existingChat.conversation)
+          : [];
+      } catch {
+        storedMessages = [];
+      }
+      if (!Array.isArray(storedMessages)) {
+        storedMessages = [];
+      }
+
+      const conversation = [...storedMessages];
+
+      for (const message of messages) {
+        const lastStored = conversation[conversation.length - 1];
+
+        if (
+          dedupeLast &&
+          lastStored &&
+          lastStored.role === message.role &&
+          lastStored.content === message.content
+        ) {
+          continue;
+        }
+
+        conversation.push(message);
+      }
+
+      return tx.chat.update({
+        where: { id: chatId },
+        data: {
+          userId: userId || existingChat.userId,
+          conversation: JSON.stringify(conversation),
+          conversationSummary:
+            conversationSummary ?? existingChat.conversationSummary,
+          lastIntent: lastIntent ?? existingChat.lastIntent,
+          bookingStatus: bookingStatus ?? existingChat.bookingStatus,
+        },
+      });
+    });
+
+    return toChatSession(updatedChat);
+  }
+
   return {
+    appendChatMessages,
     adjustEventBookedCustomers,
     createEventRecord,
     deleteEventRecord,

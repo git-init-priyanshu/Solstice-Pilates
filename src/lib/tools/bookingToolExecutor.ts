@@ -335,9 +335,10 @@ export async function executeBookingTool(
 
       case "check_booking_guest_capacity": {
         const rawAdditionalGuests = Number(args["additionalGuests"]);
-        const additionalGuests = Number.isFinite(rawAdditionalGuests)
-          ? rawAdditionalGuests
-          : 1;
+        const additionalGuests =
+          Number.isFinite(rawAdditionalGuests) && rawAdditionalGuests >= 1
+            ? rawAdditionalGuests
+            : 1;
         const booking = await getUserBookingDetails(userId);
 
         if (!booking?.event) {

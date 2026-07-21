@@ -128,7 +128,10 @@ export async function executeEventTool(
               ? endTime
               : existingEvent.endTime,
           pricingPerHour: Number(
-            args["pricingPerHour"] ?? existingEvent.pricingPerHour,
+            typeof args["pricingPerHour"] === "string" &&
+              args["pricingPerHour"].trim() === ""
+              ? existingEvent.pricingPerHour
+              : args["pricingPerHour"] ?? existingEvent.pricingPerHour,
           ),
           capacity: Number(args["capacity"] ?? existingEvent.capacity),
         };

@@ -22,7 +22,11 @@ export function useOpenAi() {
       throw new Error(payload.message || "Unable to reach the assistant.");
     }
 
-    return { reply: payload.reply ?? null, chatId: payload.chatId };
+    return {
+      reply: payload.reply ?? null,
+      chatId: payload.chatId,
+      handoff: payload.handoff === true,
+    };
   }
 
   return {

@@ -234,8 +234,8 @@ export function useDatabase() {
       );
     }
 
-    const updatedEvent = await prisma.event.update({
-      where: { id: event.eventId },
+    const { count } = await prisma.event.updateMany({
+      where: { id: event.eventId, bookedCustomers: { lte: event.capacity } },
       data: {
         name: event.name,
         startTime: event.startTime,
@@ -244,6 +244,20 @@ export function useDatabase() {
         capacity: event.capacity,
       },
     });
+
+    if (count === 0) {
+      throw new Error(
+        "The event capacity changed under a concurrent booking. Please retry.",
+      );
+    }
+
+    const updatedEvent = await prisma.event.findUnique({
+      where: { id: event.eventId },
+    });
+
+    if (!updatedEvent) {
+      throw new Error("The event could not be found.");
+    }
 
     return toEventRecord(updatedEvent);
   }

@@ -66,7 +66,7 @@ export async function POST(request: Request) {
         : "";
     const shouldHandoff =
       isExistingHandoff ||
-      /(refund|billing|charged|charge|wrong price|price issue|price complaint|complaint|complain|manager|human|admin|birthday|party|private event|celebration)/.test(
+      /(\brefund\b|\bbilling\b|\bcharged\b|\bcharge\b|wrong price|price issue|price complaint|\bcomplaint\b|\bcomplain\b|\bmanager\b|\bhuman\b|\badmin\b|\bbirthday\b|\bparty\b|private event|\bcelebration\b)/.test(
         latestUserContent,
       );
 

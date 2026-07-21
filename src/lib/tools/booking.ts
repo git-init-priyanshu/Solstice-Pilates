@@ -16,6 +16,11 @@ export const bookingTools: ChatCompletionTool[] = [
             description:
               "Exact Event sheet event name to book. Use the event name from the lookup result.",
           },
+          startTime: {
+            type: "string",
+            description:
+              "The exact start time of the chosen event occurrence from the lookup result, as an RFC3339 date-time with timezone.",
+          },
           customerName: { type: "string" },
           customerEmail: { type: "string" },
           customerPhone: { type: "string" },
@@ -49,6 +54,11 @@ export const bookingTools: ChatCompletionTool[] = [
             type: "string",
             description:
               "Exact Event sheet event name to move into. Use the event name from the lookup result.",
+          },
+          startTime: {
+            type: "string",
+            description:
+              "The exact start time of the chosen event occurrence from the lookup result, as an RFC3339 date-time with timezone.",
           },
           confirmedByCustomer: {
             type: "boolean",

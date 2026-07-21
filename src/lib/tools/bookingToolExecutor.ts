@@ -7,7 +7,8 @@ import type { ToolResult, WorkspaceToolContext } from "@/types/tools.types";
 const {
   adjustEventBookedCustomers,
   findEventById,
-  findEventByName,
+  findEventsByName,
+  findEventByNameAndStart,
   listEventsInRange,
   findUserById,
   getUserBookingDetails,
@@ -24,14 +25,36 @@ function resolveEventName(args: Record<string, unknown>) {
   return eventName.trim();
 }
 
-async function resolveEventByName(args: Record<string, unknown>) {
+async function resolveEventOccurrence(args: Record<string, unknown>) {
   const eventName = resolveEventName(args);
 
   if (!eventName) {
     return null;
   }
 
-  return findEventByName(eventName);
+  const startTime = args["startTime"];
+
+  if (typeof startTime === "string" && startTime.trim()) {
+    const event = await findEventByNameAndStart(eventName, startTime.trim());
+    if (!event) {
+      throw new Error("No event with that name starts at the given time.");
+    }
+    return event;
+  }
+
+  const events = await findEventsByName(eventName);
+
+  if (events.length === 0) {
+    return null;
+  }
+
+  if (events.length > 1) {
+    throw new Error(
+      "Multiple events share that name. Pass the exact startTime of the occurrence the client selected.",
+    );
+  }
+
+  return events[0];
 }
 
 export async function executeBookingTool(
@@ -63,7 +86,7 @@ export async function executeBookingTool(
         const customerName = args["customerName"];
         const customerEmail = args["customerEmail"];
         const customerPhone = args["customerPhone"];
-        const event = await resolveEventByName(args);
+        const event = await resolveEventOccurrence(args);
         const confirmedByCustomer = args["confirmedByCustomer"] === true;
         if (!confirmedByCustomer) {
           throw new Error("Customer must explicitly confirm before booking.");
@@ -149,7 +172,7 @@ export async function executeBookingTool(
       }
 
       case "change_user_booking": {
-        const event = await resolveEventByName(args);
+        const event = await resolveEventOccurrence(args);
         const confirmedByCustomer = args["confirmedByCustomer"] === true;
 
         if (!confirmedByCustomer) {

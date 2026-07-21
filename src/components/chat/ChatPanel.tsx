@@ -24,6 +24,7 @@ export function ChatPanel({
     chatId,
     chatInput,
     handleChatSubmit,
+    isHandoff,
     isLoading,
     messages,
     profile,
@@ -73,6 +74,12 @@ export function ChatPanel({
         subtitle={subtitle}
         title={title}
       />
+      {isHandoff && (
+        <div className="shrink-0 border-b border-border bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
+          You&apos;re now chatting with the studio team. Replies may take a
+          moment.
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 px-4 py-5">
         <div className="flex flex-col gap-4">
           {messages.map((message) => (

@@ -56,122 +56,186 @@ export async function POST(request: Request) {
 
     // Execute tools
     if (message.type === "tool-calls") {
-      const results = await Promise.all(
-        (message.toolCallList ?? []).map(async (toolCall) => {
-          const toolCallId = toolCall.id || "";
+      const toolCalls = message.toolCallList ?? [];
 
-          try {
-            const toolName = String(
-              toolCall.function?.name || toolCall.name || "",
-            );
+      // Load the stored conversation once so a voice handoff merges into it
+      // instead of overwriting an admin-visible history.
+      const existingChat = await findChatById(chatId);
+      let conversation: OpenAIChatMessage[] = [];
 
-            if (!toolCallId || !toolName) {
-              return {
-                result: "Tool call payload was invalid.",
-                toolCallId,
-              };
-            }
+      if (existingChat?.conversation) {
+        try {
+          conversation = JSON.parse(existingChat.conversation) as OpenAIChatMessage[];
+        } catch {
+          conversation = [];
+        }
+      }
 
-            let parameters: Record<string, unknown> = {};
+      const latestUserUtterance = String(
+        [
+          ...(message.artifact?.messagesOpenAIFormatted ??
+            message.messagesOpenAIFormatted ??
+            []),
+        ]
+          .reverse()
+          .find((entry) => entry.role === "user")?.content || "",
+      ).trim();
 
-            if (toolCall.parameters) {
-              parameters = toolCall.parameters;
-            } else if (typeof toolCall.arguments === "string") {
-              parameters = JSON.parse(toolCall.arguments);
-            } else if (toolCall.arguments) {
-              parameters = toolCall.arguments;
-            } else if (typeof toolCall.function?.arguments === "string") {
-              parameters = JSON.parse(toolCall.function.arguments);
-            } else if (toolCall.function?.arguments) {
-              parameters = toolCall.function.arguments;
-            }
+      // Tool calls that mutate the shared chat/session state must not race, so
+      // run them sequentially and persist a single consolidated chat write.
+      const results: Array<{ result: string; toolCallId: string }> = [];
+      let conversationChanged = false;
+      let lastIntent: string | undefined;
+      let bookingStatus: string | undefined;
+      let conversationSummary: string | undefined;
 
-            const assistantToolCall = {
-              id: toolCallId,
-              type: "function" as const,
-              function: {
-                arguments: JSON.stringify(parameters),
-                name: toolName,
-              },
-            };
+      for (const toolCall of toolCalls) {
+        const toolCallId = toolCall.id || "";
 
-            const result =
-              toolName === "list_events_in_range"
-                ? await executeEventTool(assistantToolCall)
-                : toolName === "request_human_handoff"
-                  ? {
-                      ok: true,
-                      message: "request_human_handoff completed",
-                      data: {
-                        reason:
-                          typeof parameters.reason === "string"
-                            ? parameters.reason
-                            : "",
-                      },
-                      intent: "human_handoff",
-                    }
-                  : await executeBookingTool(assistantToolCall, {
-                      chatId,
-                      userId,
-                    });
+        try {
+          const toolName = String(
+            toolCall.function?.name || toolCall.name || "",
+          );
 
-            if (!result.ok) {
-              return {
-                result: result.message.replace(/\s+/g, " ").trim(),
-                toolCallId,
-              };
-            }
+          if (!toolCallId || !toolName) {
+            results.push({
+              result: "Tool call payload was invalid.",
+              toolCallId,
+            });
+            continue;
+          }
 
-            const summary =
+          let parameters: Record<string, unknown> = {};
+
+          if (toolCall.parameters) {
+            parameters = toolCall.parameters;
+          } else if (typeof toolCall.arguments === "string") {
+            parameters = JSON.parse(toolCall.arguments);
+          } else if (toolCall.arguments) {
+            parameters = toolCall.arguments;
+          } else if (typeof toolCall.function?.arguments === "string") {
+            parameters = JSON.parse(toolCall.function.arguments);
+          } else if (toolCall.function?.arguments) {
+            parameters = toolCall.function.arguments;
+          }
+
+          const assistantToolCall = {
+            id: toolCallId,
+            type: "function" as const,
+            function: {
+              arguments: JSON.stringify(parameters),
+              name: toolName,
+            },
+          };
+
+          const result =
+            toolName === "list_events_in_range"
+              ? await executeEventTool(assistantToolCall)
+              : toolName === "request_human_handoff"
+                ? {
+                    ok: true,
+                    message: "request_human_handoff completed",
+                    data: {
+                      reason:
+                        typeof parameters.reason === "string"
+                          ? parameters.reason
+                          : "",
+                    },
+                    intent: "human_handoff",
+                  }
+                : await executeBookingTool(assistantToolCall, {
+                    chatId,
+                    userId,
+                  });
+
+          if (!result.ok) {
+            results.push({
+              result: result.message.replace(/\s+/g, " ").trim(),
+              toolCallId,
+            });
+            continue;
+          }
+
+          const summary =
+            typeof result.data === "object" &&
+            result.data &&
+            "summary" in result.data &&
+            typeof result.data.summary === "string"
+              ? result.data.summary
+              : result.message;
+
+          if (userId && result.userProfile) {
+            await upsertUserProfile({
+              userId,
+              lastChatSessionId: chatId,
+              ...result.userProfile,
+            });
+          }
+
+          if (result.bookingStatus !== undefined) {
+            bookingStatus = result.bookingStatus;
+          }
+          if (result.intent !== undefined) {
+            lastIntent = result.intent;
+          }
+
+          if (toolName === "request_human_handoff") {
+            const reason =
               typeof result.data === "object" &&
               result.data &&
-              "summary" in result.data &&
-              typeof result.data.summary === "string"
-                ? result.data.summary
-                : result.message;
+              "reason" in result.data &&
+              typeof result.data.reason === "string"
+                ? result.data.reason
+                : "";
 
-            try {
-              if (userId && result.userProfile) {
-                await upsertUserProfile({
-                  userId,
-                  lastChatSessionId: chatId,
-                  ...result.userProfile,
-                });
-              }
-              await upsertChatSession({
-                bookingStatus: result.bookingStatus,
-                chatId,
-                ...(toolName === "request_human_handoff" &&
-                typeof result.data === "object" &&
-                result.data &&
-                "reason" in result.data &&
-                typeof result.data.reason === "string" &&
-                result.data.reason
-                  ? {
-                      conversationSummary: `Handoff reason: ${result.data.reason}`,
-                    }
-                  : {}),
-                lastIntent: result.intent,
-                userId,
-              });
-            } catch (error) {
-              console.error("Unable to persist Vapi tool result.", error);
+            if (reason) {
+              conversationSummary = `Handoff reason: ${reason}`;
             }
 
-            return {
-              result: (summary || result.message).replace(/\s+/g, " ").trim(),
-              toolCallId,
-            };
-          } catch (error) {
-            console.error("Unable to execute Vapi tool call.", error);
+            // Persist a user-role message so the voice handoff surfaces in the
+            // admin handoff list (listHandoffChats requires a user message).
+            const handoffContent =
+              [reason, latestUserUtterance].filter(Boolean).join(" ").trim() ||
+              "Caller requested a human handoff.";
+            const alreadyPresent = conversation.some(
+              (entry) =>
+                entry.role === "user" && entry.content === handoffContent,
+            );
 
-            return {
-              result: "Tool execution failed.",
-              toolCallId,
-            };
+            if (!alreadyPresent) {
+              conversation.push({ role: "user", content: handoffContent });
+              conversationChanged = true;
+            }
           }
-        }),
-      );
+
+          results.push({
+            result: (summary || result.message).replace(/\s+/g, " ").trim(),
+            toolCallId,
+          });
+        } catch (error) {
+          console.error("Unable to execute Vapi tool call.", error);
+
+          results.push({
+            result: "Tool execution failed.",
+            toolCallId,
+          });
+        }
+      }
+
+      try {
+        await upsertChatSession({
+          chatId,
+          userId,
+          ...(conversationChanged
+            ? { conversation: JSON.stringify(conversation) }
+            : {}),
+          ...(conversationSummary ? { conversationSummary } : {}),
+          ...(lastIntent !== undefined ? { lastIntent } : {}),
+          ...(bookingStatus !== undefined ? { bookingStatus } : {}),
+        });
+      } catch (error) {
+        console.error("Unable to persist Vapi tool result.", error);
+      }
 
       return Response.json({ results }, { status: 200 });
     }
@@ -194,6 +258,32 @@ export async function POST(request: Request) {
           content: String(entry.content || ""),
         }));
 
+      // Merge with any stored conversation so an admin-visible handoff message
+      // injected during a tool call is not wiped by the transcript snapshot.
+      const existingChat = await findChatById(chatId);
+      const merged = [...messages];
+
+      if (existingChat?.conversation) {
+        try {
+          const stored = JSON.parse(
+            existingChat.conversation,
+          ) as OpenAIChatMessage[];
+
+          for (const entry of stored) {
+            const alreadyPresent = merged.some(
+              (item) =>
+                item.role === entry.role && item.content === entry.content,
+            );
+
+            if (!alreadyPresent) {
+              merged.push(entry);
+            }
+          }
+        } catch {
+          // Ignore an unparseable stored conversation.
+        }
+      }
+
       if (userId) {
         await upsertUserProfile({
           userId,
@@ -206,7 +296,7 @@ export async function POST(request: Request) {
       }
       await upsertChatSession({
         chatId,
-        ...(messages.length ? { conversation: JSON.stringify(messages) } : {}),
+        ...(merged.length ? { conversation: JSON.stringify(merged) } : {}),
         conversationSummary: message.artifact?.transcript,
         userId,
       });

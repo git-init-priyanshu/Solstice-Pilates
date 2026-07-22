@@ -1,6 +1,7 @@
 import type { Chat, Event, Prisma, User } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { filterEventsInRange } from "@/lib/events/eventRange";
 import type {
   EventRangeInput,
   EventRecord,
@@ -205,24 +206,9 @@ export function useDatabase() {
     startTime,
     endTime,
   }: EventRangeInput): Promise<EventRecord[]> {
-    const rangeStart = Date.parse(startTime);
-    const rangeEnd = Date.parse(endTime);
-
-    if (Number.isNaN(rangeStart) || Number.isNaN(rangeEnd)) {
-      throw new Error("startTime and endTime must be valid date-times.");
-    }
-
-    if (rangeEnd <= rangeStart) {
-      throw new Error("endTime must be after startTime.");
-    }
-
     const events = await listEvents();
 
-    return events.filter(
-      (event) =>
-        Date.parse(event.startTime) < rangeEnd &&
-        rangeStart < Date.parse(event.endTime),
-    );
+    return filterEventsInRange(events, startTime, endTime);
   }
 
   async function updateEventRecord(event: EventRecord) {

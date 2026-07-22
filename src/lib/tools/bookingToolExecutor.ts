@@ -1,6 +1,7 @@
 import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
 import { useDatabase as sheetApi } from "@/lib/database";
+import { toEventAvailability } from "@/lib/events/availability";
 import { prisma } from "@/lib/prisma";
 import type { ToolResult, WorkspaceToolContext } from "@/types/tools.types";
 
@@ -337,9 +338,7 @@ export async function executeBookingTool(
           .filter((event) => event.eventId !== booking.event?.eventId)
           .map((event) => ({
             ...event,
-            availabilityStatus:
-              event.bookedCustomers < event.capacity ? "available" : "full",
-            remainingSpots: Math.max(event.capacity - event.bookedCustomers, 0),
+            ...toEventAvailability(event),
           }));
 
         return {

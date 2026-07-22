@@ -1,6 +1,7 @@
 import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
 import { useDatabase as sheetApi } from "@/lib/database";
+import { toEventAvailability } from "@/lib/events/availability";
 import { getGoogleAccessToken } from "@/lib/googleApi";
 import type { EventRecord } from "@/types/event.types";
 import type { ToolResult } from "@/types/tools.types";
@@ -279,9 +280,7 @@ export async function executeEventTool(
           pricingPerHour: event.pricingPerHour,
           capacity: event.capacity,
           bookedCustomers: event.bookedCustomers,
-          remainingSpots: Math.max(event.capacity - event.bookedCustomers, 0),
-          availabilityStatus:
-            event.bookedCustomers < event.capacity ? "available" : "full",
+          ...toEventAvailability(event),
         }));
         const summary = eventOptions.length
           ? `Found ${eventOptions.length} event${eventOptions.length === 1 ? "" : "s"}: ${eventOptions

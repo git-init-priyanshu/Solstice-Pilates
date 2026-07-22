@@ -7,6 +7,8 @@ import type { VapiRoutePayload } from "@/types/vapi.types";
 const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
 
 export async function POST(request: Request) {
+  // This webhook is authenticated separately by VAPI_WEBHOOK_SECRET below, so it
+  // does not use the sp_session signed-cookie binding applied to /api/chat.
   const secret = process.env.VAPI_WEBHOOK_SECRET;
   const authorization = request.headers.get("authorization");
   const legacySecret = request.headers.get("x-vapi-secret");

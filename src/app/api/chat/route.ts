@@ -13,7 +13,18 @@ import { bookingTools } from "@/lib/tools/booking";
 import { eventLookupTools } from "@/lib/tools/event";
 import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
+import { verifyUserToken } from "@/lib/session/sessionToken";
 import type { ChatRequestBody } from "@/types/chat.types";
+
+function readSessionCookie(request: Request): string {
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const match = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("sp_session="));
+
+  return match ? match.slice("sp_session=".length) : "";
+}
 
 const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
 
@@ -24,9 +35,19 @@ export async function POST(request: Request) {
       (message) => message.role === "user" || message.role === "assistant",
     ) ?? [];
 
+    // Bind booking actions to the signed session cookie so a caller cannot act
+    // as an arbitrary userId supplied in the request body. Prefer the
+    // cookie-derived userId; drop it entirely when the cookie is missing,
+    // invalid, or does not match the body value so user-mutating tools fail.
+    const verifiedUserId = verifyUserToken(readSessionCookie(request));
+    const sessionUserId =
+      verifiedUserId && verifiedUserId === body.userId
+        ? verifiedUserId
+        : undefined;
+
     const toolContext = {
       chatId: body.chatId ?? crypto.randomUUID(),
-      userId: body.userId,
+      userId: sessionUserId,
     };
 
     if (body.chatId) {
@@ -41,9 +62,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const session = body.userId
+    const session = toolContext.userId
       ? await upsertUserProfile({
-          userId: body.userId,
+          userId: toolContext.userId,
           lastChatSessionId: toolContext.chatId,
           name: body.userProfile?.name,
           email: body.userProfile?.email,

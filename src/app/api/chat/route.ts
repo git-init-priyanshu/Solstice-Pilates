@@ -17,6 +17,9 @@ import type { ChatRequestBody } from "@/types/chat.types";
 
 const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
 
+const fallbackReply =
+  "Sorry, I couldn't complete that just now. Could you rephrase or try again?";
+
 export async function POST(request: Request) {
   try {
     const body: ChatRequestBody = await request.json();
@@ -157,8 +160,12 @@ export async function POST(request: Request) {
       const toolCalls = llmMessage.tool_calls ?? [];
 
       if (!toolCalls.length) {
-        const reply = llmMessage.content;
+        const reply = llmMessage.content || fallbackReply;
 
+        // `messages` is the client-supplied history. During a handoff the client
+        // polls and re-sends the admin's assistant replies, so persisting
+        // `[...messages, reply]` here preserves those prior handoff turns after a
+        // resume; the new assistant reply is always appended last.
         await upsertChatSession({
           bookingStatus,
           chatId: toolContext.chatId,
@@ -230,12 +237,35 @@ export async function POST(request: Request) {
       }
     }
 
-    return Response.json(
-      {
-        message: "The assistant is taking too long to process the request.",
-      },
-      { status: 500 },
-    );
+    // Tool rounds exhausted: force one final natural-language reply without
+    // tools so the user's turn is never silently lost.
+    const finalResponse = await openAiClient.chat.completions.create({
+      model: chatModel,
+      messages: conversationMemory,
+      tool_choice: "none",
+    });
+    const reply = finalResponse.choices[0]?.message?.content || fallbackReply;
+
+    await upsertChatSession({
+      bookingStatus,
+      chatId: toolContext.chatId,
+      conversation: JSON.stringify([
+        ...messages,
+        {
+          role: "assistant",
+          content: reply,
+        },
+      ]),
+      ...(conversationSummary ? { conversationSummary } : {}),
+      lastIntent,
+      userId: toolContext.userId || "",
+    });
+
+    return Response.json({
+      reply,
+      chatId: toolContext.chatId,
+      handoff: lastIntent === "human_handoff",
+    });
   } catch {
     return Response.json(
       {

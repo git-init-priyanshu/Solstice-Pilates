@@ -174,17 +174,23 @@ export function useChat({
         setChatId(serverChatId);
       }
 
-      if (handoff || !reply) {
+      if (handoff) {
         setIsHandoff(true);
       }
 
-      if (reply) {
+      const replyText =
+        reply ||
+        (handoff
+          ? ""
+          : "Sorry, I didn't catch that — could you try again?");
+
+      if (replyText) {
         setMessages((currentMessages) => [
           ...currentMessages,
           {
             id: crypto.randomUUID(),
             sender: "LLM",
-            text: reply,
+            text: replyText,
             time: getCurrentTime(),
           },
         ]);

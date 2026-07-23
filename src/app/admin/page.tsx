@@ -5,6 +5,7 @@ import { LoaderCircle, RefreshCcw, Send } from "lucide-react";
 
 import ChatHeader from "@/components/chat/ChatHeader";
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { EventsPanel } from "@/components/admin/EventsPanel";
 import { Button } from "@/components/ui/button";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 import type { ChatSessionRecord, UserProfile } from "@/types/session.types";
@@ -59,6 +60,7 @@ export default function AdminPage() {
       setChats(nextChats);
       setSelectedChatId((currentChatId) =>
         currentChatId === "assistant" ||
+        currentChatId === "events" ||
         nextChats.some((chat) => chat.user.userId === currentChatId)
           ? currentChatId
           : "assistant",
@@ -130,6 +132,7 @@ export default function AdminPage() {
       setChats(nextChats);
       setSelectedChatId((currentChatId) =>
         currentChatId === "assistant" ||
+        currentChatId === "events" ||
         nextChats.some((chat) => chat.user.userId === currentChatId)
           ? currentChatId
           : "assistant",
@@ -287,6 +290,19 @@ export default function AdminPage() {
               </p>
             </button>
 
+            <button
+              className={`w-full border-b border-border px-4 py-3 text-left transition hover:bg-muted ${
+                selectedChatId === "events" ? "bg-muted" : "bg-card"
+              }`}
+              onClick={() => setSelectedChatId("events")}
+              type="button"
+            >
+              <p className="text-sm font-semibold text-foreground">Events</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                List, create, edit, and delete studio events.
+              </p>
+            </button>
+
             {chats.map((chat) => {
               const lastMessage = [...chat.messages]
                 .reverse()
@@ -344,6 +360,8 @@ export default function AdminPage() {
                 userIdStorageKey="solstice_pilates_admin_user_id"
               />
             </div>
+          ) : selectedChatId === "events" ? (
+            <EventsPanel adminUserId={adminUserId} />
           ) : (
             <div className="flex h-full min-h-0 flex-col">
               <ChatHeader

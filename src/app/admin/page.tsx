@@ -6,6 +6,7 @@ import { LoaderCircle, RefreshCcw, Send } from "lucide-react";
 import ChatHeader from "@/components/chat/ChatHeader";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { EventsPanel } from "@/components/admin/EventsPanel";
+import { AnalyticsPanel } from "@/components/admin/AnalyticsPanel";
 import { Button } from "@/components/ui/button";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 import type { ChatSessionRecord, UserProfile } from "@/types/session.types";
@@ -61,6 +62,7 @@ export default function AdminPage() {
       setSelectedChatId((currentChatId) =>
         currentChatId === "assistant" ||
         currentChatId === "events" ||
+        currentChatId === "analytics" ||
         nextChats.some((chat) => chat.user.userId === currentChatId)
           ? currentChatId
           : "assistant",
@@ -97,6 +99,8 @@ export default function AdminPage() {
         setChats(nextChats);
         setSelectedChatId((currentChatId) =>
           currentChatId === "assistant" ||
+          currentChatId === "events" ||
+          currentChatId === "analytics" ||
           nextChats.some((chat) => chat.user.userId === currentChatId)
             ? currentChatId
             : "assistant",
@@ -133,6 +137,7 @@ export default function AdminPage() {
       setSelectedChatId((currentChatId) =>
         currentChatId === "assistant" ||
         currentChatId === "events" ||
+        currentChatId === "analytics" ||
         nextChats.some((chat) => chat.user.userId === currentChatId)
           ? currentChatId
           : "assistant",
@@ -303,6 +308,19 @@ export default function AdminPage() {
               </p>
             </button>
 
+            <button
+              className={`w-full border-b border-border px-4 py-3 text-left transition hover:bg-muted ${
+                selectedChatId === "analytics" ? "bg-muted" : "bg-card"
+              }`}
+              onClick={() => setSelectedChatId("analytics")}
+              type="button"
+            >
+              <p className="text-sm font-semibold text-foreground">Analytics</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                Review studio occupancy, demand, and revenue.
+              </p>
+            </button>
+
             {chats.map((chat) => {
               const lastMessage = [...chat.messages]
                 .reverse()
@@ -362,6 +380,8 @@ export default function AdminPage() {
             </div>
           ) : selectedChatId === "events" ? (
             <EventsPanel adminUserId={adminUserId} />
+          ) : selectedChatId === "analytics" ? (
+            <AnalyticsPanel adminUserId={adminUserId} />
           ) : (
             <div className="flex h-full min-h-0 flex-col">
               <ChatHeader

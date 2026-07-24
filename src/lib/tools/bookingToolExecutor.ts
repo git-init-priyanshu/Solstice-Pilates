@@ -2,6 +2,7 @@ import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 
 import { useDatabase as sheetApi } from "@/lib/database";
 import { prisma } from "@/lib/prisma";
+import { classifyBooking } from "@/lib/tools/bookingClassifier";
 import type { ToolResult, WorkspaceToolContext } from "@/types/tools.types";
 
 const {
@@ -99,27 +100,20 @@ export async function executeBookingTool(
         }
 
         const existingUser = await findUserById(userId);
-        const isSameEvent =
-          existingUser?.bookingStatus === "booked" &&
-          existingUser.bookedEventId === event.eventId;
-        const isGuestBooking =
-          isSameEvent &&
-          (existingUser?.name !== customerName ||
-            existingUser?.email !== customerEmail ||
-            existingUser?.phone !== customerPhone);
-        if (isSameEvent && !isGuestBooking) {
+        const { isGuestBooking, previousBookedEventId, isSelfRebookSameEvent } =
+          classifyBooking({
+            existingUser,
+            event,
+            customerName,
+            customerEmail,
+            customerPhone,
+          });
+        if (isSelfRebookSameEvent) {
           throw new Error("The user is already booked into that event.");
         }
         if (event.bookedCustomers >= event.capacity) {
           throw new Error("This event is already full.");
         }
-
-        const previousBookedEventId =
-          existingUser?.bookingStatus === "booked" &&
-          existingUser.bookedEventId !== event.eventId &&
-          !isGuestBooking
-            ? existingUser.bookedEventId
-            : "";
 
         const bookingUserId = isGuestBooking ? crypto.randomUUID() : userId;
 
@@ -142,10 +136,12 @@ export async function executeBookingTool(
             phone: customerPhone,
           });
         } catch (error) {
-          await adjustEventBookedCustomers(event.eventId, -1);
-          if (previousBookedEventId) {
-            await adjustEventBookedCustomers(previousBookedEventId, 1);
-          }
+          await prisma.$transaction(async (tx) => {
+            await adjustEventBookedCustomers(event.eventId, -1, tx);
+            if (previousBookedEventId) {
+              await adjustEventBookedCustomers(previousBookedEventId, 1, tx);
+            }
+          });
           throw error;
         }
 
@@ -220,8 +216,10 @@ export async function executeBookingTool(
             lastChatSessionId: toolContext.chatId,
           });
         } catch (error) {
-          await adjustEventBookedCustomers(event.eventId, -1);
-          await adjustEventBookedCustomers(previousBookedEventId, 1);
+          await prisma.$transaction(async (tx) => {
+            await adjustEventBookedCustomers(event.eventId, -1, tx);
+            await adjustEventBookedCustomers(previousBookedEventId, 1, tx);
+          });
           throw error;
         }
 

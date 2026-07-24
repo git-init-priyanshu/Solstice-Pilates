@@ -36,6 +36,17 @@ function toChatSession(chat: Chat): ChatSessionRecord {
   };
 }
 
+export function eventOverlapsRange(
+  event: Pick<EventRecord, "startTime" | "endTime">,
+  rangeStart: number,
+  rangeEnd: number,
+): boolean {
+  return (
+    Date.parse(event.startTime) < rangeEnd &&
+    rangeStart < Date.parse(event.endTime)
+  );
+}
+
 function toEventRecord(event: Event): EventRecord {
   return {
     eventId: event.id,
@@ -218,10 +229,8 @@ export function useDatabase() {
 
     const events = await listEvents();
 
-    return events.filter(
-      (event) =>
-        Date.parse(event.startTime) < rangeEnd &&
-        rangeStart < Date.parse(event.endTime),
+    return events.filter((event) =>
+      eventOverlapsRange(event, rangeStart, rangeEnd),
     );
   }
 

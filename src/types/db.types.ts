@@ -17,3 +17,13 @@ export type ChatSessionInput = {
   lastIntent?: string;
   bookingStatus?: string;
 };
+
+export type AppendChatMessagesInput = {
+  chatId: string;
+  messages: Array<{ role: string; content: string }>;
+  lastIntent?: string;
+  bookingStatus?: string;
+  userId?: string;
+  conversationSummary?: string;
+  dedupeLast?: boolean;
+};

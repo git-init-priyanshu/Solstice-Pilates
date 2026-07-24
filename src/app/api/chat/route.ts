@@ -15,7 +15,8 @@ import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 import type { ChatRequestBody } from "@/types/chat.types";
 
-const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
+const { appendChatMessages, findChatById, upsertChatSession, upsertUserProfile } =
+  sheetApi();
 
 const fallbackReply =
   "Sorry, I couldn't complete that just now. Could you rephrase or try again?";
@@ -88,40 +89,21 @@ export async function POST(request: Request) {
         ? null
         : "I've shared this with the studio admin. They will reply here soon.";
 
-      let storedMessages: Array<{ role: string; content: string }> = [];
-      try {
-        storedMessages = storedChat?.conversation
-          ? JSON.parse(storedChat.conversation)
-          : [];
-      } catch {
-        storedMessages = [];
-      }
-      if (!Array.isArray(storedMessages)) {
-        storedMessages = [];
-      }
+      const appendedMessages: Array<{ role: string; content: string }> = [];
 
-      const conversation = [...storedMessages];
-      const lastStored = conversation[conversation.length - 1];
-
-      if (
-        latestUserMessage &&
-        !(
-          lastStored &&
-          lastStored.role === latestUserMessage.role &&
-          lastStored.content === latestUserMessage.content
-        )
-      ) {
-        conversation.push(latestUserMessage);
+      if (latestUserMessage) {
+        appendedMessages.push(latestUserMessage);
       }
 
       if (reply) {
-        conversation.push({ role: "assistant", content: reply });
+        appendedMessages.push({ role: "assistant", content: reply });
       }
 
-      await upsertChatSession({
+      await appendChatMessages({
         bookingStatus: session?.chat.bookingStatus ?? "",
         chatId: toolContext.chatId,
-        conversation: JSON.stringify(conversation),
+        dedupeLast: true,
+        messages: appendedMessages,
         lastIntent: "human_handoff",
         userId: toolContext.userId || "",
       });

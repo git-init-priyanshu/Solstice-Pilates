@@ -14,6 +14,9 @@ import type { ChatRequestBody } from "@/types/chat.types";
 
 const { upsertChatSession, upsertUserProfile } = sheetApi();
 
+const fallbackReply =
+  "Sorry, I couldn't complete that just now. Could you rephrase or try again?";
+
 export async function POST(request: Request) {
   try {
     const body: ChatRequestBody = await request.json();
@@ -73,7 +76,7 @@ export async function POST(request: Request) {
       const toolCalls = llmMessage.tool_calls ?? [];
 
       if (!toolCalls.length) {
-        const reply = llmMessage.content;
+        const reply = llmMessage.content || fallbackReply;
 
         await upsertChatSession({
           chatId: toolContext.chatId,
@@ -114,12 +117,29 @@ export async function POST(request: Request) {
       }
     }
 
-    return Response.json(
-      {
-        message: "The assistant is taking too long to process the request.",
-      },
-      { status: 500 },
-    );
+    // Tool rounds exhausted: force one final natural-language reply without
+    // tools so the admin's turn is never silently lost.
+    const finalResponse = await client.chat.completions.create({
+      model: chatModel,
+      messages: conversationMemory,
+      tool_choice: "none",
+    });
+    const reply = finalResponse.choices[0]?.message?.content || fallbackReply;
+
+    await upsertChatSession({
+      chatId: toolContext.chatId,
+      conversation: JSON.stringify([
+        ...messages,
+        {
+          role: "assistant",
+          content: reply,
+        },
+      ]),
+      lastIntent,
+      userId: toolContext.userId || "",
+    });
+
+    return Response.json({ reply, chatId: toolContext.chatId });
   } catch {
     return Response.json(
       {

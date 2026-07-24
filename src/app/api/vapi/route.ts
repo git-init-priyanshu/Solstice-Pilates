@@ -3,6 +3,7 @@ import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
 import { executeEventTool } from "@/lib/tools/eventToolExecutor";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 import type { VapiRoutePayload } from "@/types/vapi.types";
+import { resolveTranscriptSummary } from "@/lib/chat/vapiHelpers";
 
 const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
 
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
       let lastIntent: string | undefined;
       let bookingStatus: string | undefined;
       let conversationSummary: string | undefined;
+      let handoffTriggered = false;
 
       for (const toolCall of toolCalls) {
         const toolCallId = toolCall.id || "";
@@ -178,6 +180,9 @@ export async function POST(request: Request) {
           if (result.intent !== undefined) {
             lastIntent = result.intent;
           }
+          if (result.intent === "human_handoff") {
+            handoffTriggered = true;
+          }
 
           if (toolName === "request_human_handoff") {
             const reason =
@@ -219,6 +224,26 @@ export async function POST(request: Request) {
             result: "Tool execution failed.",
             toolCallId,
           });
+        }
+      }
+
+      // A handoff must win over any later tool in the same batch, otherwise the
+      // conversation drops out of listHandoffChats (needs lastIntent === "human_handoff").
+      if (handoffTriggered) {
+        lastIntent = "human_handoff";
+      }
+
+      // Keep voice bookings auditable: merge the caller's latest utterance even
+      // when no handoff happened, so the admin view sees what was said.
+      if (latestUserUtterance) {
+        const alreadyPresent = conversation.some(
+          (entry) =>
+            entry.role === "user" && entry.content === latestUserUtterance,
+        );
+
+        if (!alreadyPresent) {
+          conversation.push({ role: "user", content: latestUserUtterance });
+          conversationChanged = true;
         }
       }
 
@@ -294,10 +319,14 @@ export async function POST(request: Request) {
           role: "user",
         });
       }
+      const conversationSummary = resolveTranscriptSummary(
+        existingChat?.conversationSummary,
+        message.artifact?.transcript,
+      );
       await upsertChatSession({
         chatId,
         ...(merged.length ? { conversation: JSON.stringify(merged) } : {}),
-        conversationSummary: message.artifact?.transcript,
+        ...(conversationSummary !== undefined ? { conversationSummary } : {}),
         userId,
       });
     }

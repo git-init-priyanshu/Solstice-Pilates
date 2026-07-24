@@ -3,6 +3,7 @@ import { ChatCompletionMessageFunctionToolCall } from "openai/resources.js";
 import { useDatabase as sheetApi } from "@/lib/database";
 import { prisma } from "@/lib/prisma";
 import { classifyBooking } from "@/lib/tools/bookingClassifier";
+import { isPastEventStart } from "@/lib/tools/eventTime";
 import type { ToolResult, WorkspaceToolContext } from "@/types/tools.types";
 
 const {
@@ -111,6 +112,11 @@ export async function executeBookingTool(
         if (isSelfRebookSameEvent) {
           throw new Error("The user is already booked into that event.");
         }
+        if (isPastEventStart(event.startTime)) {
+          throw new Error(
+            "That event has already started or ended. Please choose an upcoming time.",
+          );
+        }
         if (event.bookedCustomers >= event.capacity) {
           throw new Error("This event is already full.");
         }
@@ -195,6 +201,11 @@ export async function executeBookingTool(
         }
         if (previousBookedEventId === event.eventId) {
           throw new Error("The user is already booked into that event.");
+        }
+        if (isPastEventStart(event.startTime)) {
+          throw new Error(
+            "That event has already started or ended. Please choose an upcoming time.",
+          );
         }
         if (event.bookedCustomers >= event.capacity) {
           throw new Error("This event is already full.");
@@ -333,6 +344,7 @@ export async function executeBookingTool(
               event.name.toLowerCase() === targetEventName.toLowerCase(),
           )
           .filter((event) => event.eventId !== booking.event?.eventId)
+          .filter((event) => !isPastEventStart(event.startTime))
           .map((event) => ({
             ...event,
             availabilityStatus:

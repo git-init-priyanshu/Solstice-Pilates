@@ -6,7 +6,7 @@ export const eventLookupTools: ChatCompletionTool[] = [
     function: {
       name: "list_events_in_range",
       description:
-        "Read studio events from the Event sheet before answering event schedule, pricing, or availability questions. Use the exact event name from the lookup result when booking or changing an event.",
+        "Read studio events from the Event sheet before answering event schedule, pricing, or availability questions. Use the exact event name from the lookup result when booking or changing an event. Occurrences marked past (availabilityStatus \"past\" or isPast true) have already started and cannot be booked; only propose upcoming occurrences.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -34,7 +34,7 @@ export const adminEventTools: ChatCompletionTool[] = [
     function: {
       name: "create_event_record",
       description:
-        "Create a studio event in Google Calendar and persist it in the Event sheet after the admin provides the name, start time, end time, pricing per hour, and capacity.",
+        "Create a studio event in Google Calendar and persist it in the Event sheet after the admin provides the name, start time, end time, pricing per hour, and capacity. The start time must be in the future.",
       parameters: {
         type: "object",
         additionalProperties: false,

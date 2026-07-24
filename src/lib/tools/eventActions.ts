@@ -6,6 +6,7 @@ import {
   scheduleCalendarEvent,
   updateCalendarEvent,
 } from "@/lib/calendarApi";
+import { isPastEventStart } from "@/lib/tools/eventTime";
 
 const {
   createEventRecord,
@@ -50,6 +51,9 @@ export async function createEvent(input: CreateEventInput) {
   }
   if (Date.parse(endTime as string) <= Date.parse(startTime as string)) {
     throw new Error("endTime must be after startTime.");
+  }
+  if (isPastEventStart(startTime as string)) {
+    throw new Error("startTime must be in the future.");
   }
   if (!Number.isFinite(pricingPerHour) || pricingPerHour < 0) {
     throw new Error("pricingPerHour must be a non-negative number.");
@@ -257,23 +261,30 @@ export async function listEventsForRange(startTime: string, endTime: string) {
     startTime,
     endTime,
   });
-  const eventOptions = data.map((event) => ({
-    eventId: event.eventId,
-    name: event.name,
-    startTime: event.startTime,
-    endTime: event.endTime,
-    pricingPerHour: event.pricingPerHour,
-    capacity: event.capacity,
-    bookedCustomers: event.bookedCustomers,
-    remainingSpots: Math.max(event.capacity - event.bookedCustomers, 0),
-    availabilityStatus:
-      event.bookedCustomers < event.capacity ? "available" : "full",
-  }));
+  const eventOptions = data.map((event) => {
+    const isPast = isPastEventStart(event.startTime);
+    return {
+      eventId: event.eventId,
+      name: event.name,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      pricingPerHour: event.pricingPerHour,
+      capacity: event.capacity,
+      bookedCustomers: event.bookedCustomers,
+      remainingSpots: Math.max(event.capacity - event.bookedCustomers, 0),
+      isPast,
+      availabilityStatus: isPast
+        ? "past"
+        : event.bookedCustomers < event.capacity
+          ? "available"
+          : "full",
+    };
+  });
   const summary = eventOptions.length
     ? `Found ${eventOptions.length} event${eventOptions.length === 1 ? "" : "s"}: ${eventOptions
         .map(
           (event) =>
-            `${event.name}, ${event.startTime} to ${event.endTime}, ${event.availabilityStatus}, ${event.remainingSpots} spots remaining, price ${event.pricingPerHour}`,
+            `${event.name}, ${event.startTime} to ${event.endTime}, ${event.isPast ? "past" : `${event.availabilityStatus}, ${event.remainingSpots} spots remaining`}, price ${event.pricingPerHour}`,
         )
         .join("; ")}.`
     : `No events found between ${startTime} and ${endTime}.`;

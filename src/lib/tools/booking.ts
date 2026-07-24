@@ -6,7 +6,7 @@ export const bookingTools: ChatCompletionTool[] = [
     function: {
       name: "create_user_booking",
       description:
-        "Store a confirmed event booking in the User sheet after the event is identified from the Event sheet.",
+        "Store a confirmed event booking in the User sheet after the event is identified from the Event sheet. Only upcoming occurrences can be booked; never book an occurrence whose start time has already passed.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -45,7 +45,7 @@ export const bookingTools: ChatCompletionTool[] = [
     function: {
       name: "change_user_booking",
       description:
-        "Move the current user's existing event booking to another Event sheet event after the user explicitly confirms the new event.",
+        "Move the current user's existing event booking to another Event sheet event after the user explicitly confirms the new event. Only upcoming occurrences can be moved into; never propose an occurrence whose start time has already passed.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -127,7 +127,7 @@ export const bookingTools: ChatCompletionTool[] = [
     function: {
       name: "find_alternative_event_options",
       description:
-        "For a user with an existing booking, find alternative event times in a requested window, excluding the current booking and checking seat availability.",
+        "For a user with an existing booking, find alternative event times in a requested window, excluding the current booking and checking seat availability. Only upcoming occurrences are returned; past occurrences are never offered.",
       parameters: {
         type: "object",
         additionalProperties: false,

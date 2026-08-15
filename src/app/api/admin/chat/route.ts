@@ -7,8 +7,7 @@ import {
   createCurrentDateContext,
   createOpenAIClient,
 } from "@/lib/chat/chatHelpers";
-import { adminEventTools } from "@/lib/tools/event";
-import { executeEventTool } from "@/lib/tools/eventToolExecutor";
+import { runTool, toolSchemasFor } from "@/lib/tools/registry";
 import { isAdminUser, isAllowlistedAdmin } from "@/lib/adminAuth";
 import type { ChatRequestBody } from "@/types/chat.types";
 
@@ -61,7 +60,7 @@ export async function POST(request: Request) {
       const response = await client.chat.completions.create({
         model: chatModel,
         messages: conversationMemory,
-        tools: adminEventTools,
+        tools: toolSchemasFor("admin"),
         tool_choice: "auto",
       });
       const llmMessage = response.choices[0]?.message;
@@ -102,7 +101,12 @@ export async function POST(request: Request) {
           continue;
         }
 
-        const result = await executeEventTool(toolCall);
+        const result = await runTool(
+          toolCall.function.name,
+          toolCall.function.arguments,
+          "admin",
+          toolContext,
+        );
 
         lastIntent = result.intent ?? "";
 

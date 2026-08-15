@@ -13,6 +13,8 @@ export type ToolResult = {
 
 export type ToolArgs = Record<string, unknown>;
 
+export type AgentScope = "client" | "admin" | "voice";
+
 export type WorkspaceToolContext = {
   chatId?: string;
   userId?: string;

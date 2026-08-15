@@ -9,10 +9,7 @@ import {
   createKnownUserContext,
   createOpenAIClient,
 } from "@/lib/chat/chatHelpers";
-import { bookingTools } from "@/lib/tools/booking";
-import { eventLookupTools } from "@/lib/tools/event";
-import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
-import { executeEventTool } from "@/lib/tools/eventToolExecutor";
+import { runTool, toolSchemasFor } from "@/lib/tools/registry";
 import type { ChatRequestBody } from "@/types/chat.types";
 
 const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
@@ -148,7 +145,7 @@ export async function POST(request: Request) {
       const response = await openAiClient.chat.completions.create({
         model: chatModel,
         messages: conversationMemory,
-        tools: [...eventLookupTools, ...bookingTools],
+        tools: toolSchemasFor("client"),
         tool_choice: "auto",
       });
       const llmMessage = response.choices[0]?.message;
@@ -199,10 +196,12 @@ export async function POST(request: Request) {
           continue;
         }
 
-        const result =
-          toolCall.function.name === "list_events_in_range"
-            ? await executeEventTool(toolCall)
-            : await executeBookingTool(toolCall, toolContext);
+        const result = await runTool(
+          toolCall.function.name,
+          toolCall.function.arguments,
+          "client",
+          toolContext,
+        );
 
         lastIntent = result.intent ?? "";
 

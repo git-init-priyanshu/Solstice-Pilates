@@ -1,15 +1,11 @@
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-
 import { useDatabase as sheetApi } from "@/lib/database";
-import { assistantInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
+import { runAgentLoop } from "@/lib/chat/agentLoop";
+import { assistantInstructions } from "@/lib/chat/chatConstants";
 import { shouldTriggerHandoff, wantsAssistantBack } from "@/lib/chat/handoff";
 import {
-  chatModel,
-  createCurrentDateContext,
   createKnownUserContext,
   createOpenAIClient,
 } from "@/lib/chat/chatHelpers";
-import { runTool, toolSchemasFor } from "@/lib/tools/registry";
 import type { ChatRequestBody } from "@/types/chat.types";
 
 const { findChatById, upsertChatSession, upsertUserProfile } = sheetApi();
@@ -126,125 +122,36 @@ export async function POST(request: Request) {
       return Response.json({ reply, chatId: toolContext.chatId, handoff: true });
     }
 
-    const openAiClient = createOpenAIClient();
-    let bookingStatus: string | undefined;
-    let lastIntent = "chat";
-    let conversationSummary: string | undefined;
     const knownUserContext = createKnownUserContext(body.userProfile);
-    const conversationMemory: ChatCompletionMessageParam[] = [
-      {
-        role: "system",
-        content: assistantInstructions,
-      },
-      createCurrentDateContext(),
-      ...(knownUserContext ? [knownUserContext] : []),
-      ...messages,
-    ];
+    const {
+      reply,
+      lastIntent,
+      bookingStatus,
+      conversationSummary,
+      userProfileUpdates,
+    } = await runAgentLoop({
+      client: createOpenAIClient(),
+      instructions: assistantInstructions,
+      scope: "client",
+      messages,
+      contextMessages: knownUserContext ? [knownUserContext] : [],
+      toolContext,
+      initialIntent: "chat",
+      fallbackReply,
+    });
 
-    for (let round = 0; round < maxToolRounds; round += 1) {
-      const response = await openAiClient.chat.completions.create({
-        model: chatModel,
-        messages: conversationMemory,
-        tools: toolSchemasFor("client"),
-        tool_choice: "auto",
+    if (toolContext.userId && userProfileUpdates) {
+      await upsertUserProfile({
+        userId: toolContext.userId,
+        lastChatSessionId: toolContext.chatId,
+        ...userProfileUpdates,
       });
-      const llmMessage = response.choices[0]?.message;
-
-      if (!llmMessage) {
-        break;
-      }
-
-      const toolCalls = llmMessage.tool_calls ?? [];
-
-      if (!toolCalls.length) {
-        const reply = llmMessage.content || fallbackReply;
-
-        // `messages` is the client-supplied history. During a handoff the client
-        // polls and re-sends the admin's assistant replies, so persisting
-        // `[...messages, reply]` here preserves those prior handoff turns after a
-        // resume; the new assistant reply is always appended last.
-        await upsertChatSession({
-          bookingStatus,
-          chatId: toolContext.chatId,
-          conversation: JSON.stringify([
-            ...messages,
-            {
-              role: "assistant",
-              content: reply,
-            },
-          ]),
-          ...(conversationSummary ? { conversationSummary } : {}),
-          lastIntent,
-          userId: toolContext.userId || "",
-        });
-
-        return Response.json({
-          reply,
-          chatId: toolContext.chatId,
-          handoff: lastIntent === "human_handoff",
-        });
-      }
-
-      conversationMemory.push({
-        role: "assistant",
-        content: llmMessage.content,
-        tool_calls: toolCalls,
-      });
-
-      for (const toolCall of toolCalls) {
-        if (toolCall.type !== "function") {
-          continue;
-        }
-
-        const result = await runTool(
-          toolCall.function.name,
-          toolCall.function.arguments,
-          "client",
-          toolContext,
-        );
-
-        lastIntent = result.intent ?? "";
-
-        if (
-          result.intent === "human_handoff" &&
-          typeof result.data === "object" &&
-          result.data &&
-          "reason" in result.data &&
-          typeof result.data.reason === "string" &&
-          result.data.reason
-        ) {
-          conversationSummary = `Handoff reason: ${result.data.reason}`;
-        }
-
-        if (result.bookingStatus) {
-          bookingStatus = result.bookingStatus;
-        }
-
-        if (toolContext.userId && result.userProfile) {
-          await upsertUserProfile({
-            userId: toolContext.userId,
-            lastChatSessionId: toolContext.chatId,
-            ...result.userProfile,
-          });
-        }
-
-        conversationMemory.push({
-          role: "tool",
-          content: JSON.stringify(result),
-          tool_call_id: toolCall.id,
-        });
-      }
     }
 
-    // Tool rounds exhausted: force one final natural-language reply without
-    // tools so the user's turn is never silently lost.
-    const finalResponse = await openAiClient.chat.completions.create({
-      model: chatModel,
-      messages: conversationMemory,
-      tool_choice: "none",
-    });
-    const reply = finalResponse.choices[0]?.message?.content || fallbackReply;
-
+    // `messages` is the client-supplied history. During a handoff the client
+    // polls and re-sends the admin's assistant replies, so persisting
+    // `[...messages, reply]` here preserves those prior handoff turns after a
+    // resume; the new assistant reply is always appended last.
     await upsertChatSession({
       bookingStatus,
       chatId: toolContext.chatId,

@@ -1,13 +1,7 @@
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-
 import { useDatabase as sheetApi } from "@/lib/database";
-import { adminInstructions, maxToolRounds } from "@/lib/chat/chatConstants";
-import {
-  chatModel,
-  createCurrentDateContext,
-  createOpenAIClient,
-} from "@/lib/chat/chatHelpers";
-import { runTool, toolSchemasFor } from "@/lib/tools/registry";
+import { runAgentLoop } from "@/lib/chat/agentLoop";
+import { adminInstructions } from "@/lib/chat/chatConstants";
+import { createOpenAIClient } from "@/lib/chat/chatHelpers";
 import { isAdminUser, isAllowlistedAdmin } from "@/lib/adminAuth";
 import type { ChatRequestBody } from "@/types/chat.types";
 
@@ -48,87 +42,15 @@ export async function POST(request: Request) {
       userId: toolContext.userId,
     });
 
-    const client = createOpenAIClient();
-    let lastIntent = "admin_chat";
-    const conversationMemory: ChatCompletionMessageParam[] = [
-      {
-        role: "system",
-        content: adminInstructions,
-      },
-      createCurrentDateContext(),
-      ...messages,
-    ];
-
-    for (let round = 0; round < maxToolRounds; round += 1) {
-      const response = await client.chat.completions.create({
-        model: chatModel,
-        messages: conversationMemory,
-        tools: toolSchemasFor("admin"),
-        tool_choice: "auto",
-      });
-      const llmMessage = response.choices[0]?.message;
-
-      if (!llmMessage) {
-        break;
-      }
-
-      const toolCalls = llmMessage.tool_calls ?? [];
-
-      if (!toolCalls.length) {
-        const reply = llmMessage.content || fallbackReply;
-
-        await upsertChatSession({
-          chatId: toolContext.chatId,
-          conversation: JSON.stringify([
-            ...messages,
-            {
-              role: "assistant",
-              content: reply,
-            },
-          ]),
-          lastIntent,
-          userId: toolContext.userId || "",
-        });
-
-        return Response.json({ reply, chatId: toolContext.chatId });
-      }
-
-      conversationMemory.push({
-        role: "assistant",
-        content: llmMessage.content,
-        tool_calls: toolCalls,
-      });
-
-      for (const toolCall of toolCalls) {
-        if (toolCall.type !== "function") {
-          continue;
-        }
-
-        const result = await runTool(
-          toolCall.function.name,
-          toolCall.function.arguments,
-          "admin",
-          toolContext,
-        );
-
-        lastIntent = result.intent ?? "";
-
-        conversationMemory.push({
-          role: "tool",
-          content: JSON.stringify(result),
-          tool_call_id: toolCall.id,
-        });
-      }
-    }
-
-    // Tool rounds exhausted: force one final natural-language reply without
-    // tools so the admin's turn is never silently lost.
-    const finalResponse = await client.chat.completions.create({
-      model: chatModel,
-      messages: conversationMemory,
-      tool_choice: "none",
+    const { reply, lastIntent } = await runAgentLoop({
+      client: createOpenAIClient(),
+      instructions: adminInstructions,
+      scope: "admin",
+      messages,
+      toolContext,
+      initialIntent: "admin_chat",
+      fallbackReply,
     });
-    const reply = finalResponse.choices[0]?.message?.content || fallbackReply;
 
     await upsertChatSession({
       chatId: toolContext.chatId,

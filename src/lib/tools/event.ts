@@ -1,6 +1,6 @@
-import type { ChatCompletionTool } from "openai/resources/chat/completions";
+import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
 
-export const eventLookupTools: ChatCompletionTool[] = [
+export const eventLookupTools: ChatCompletionFunctionTool[] = [
   {
     type: "function",
     function: {
@@ -28,7 +28,7 @@ export const eventLookupTools: ChatCompletionTool[] = [
   },
 ];
 
-export const adminEventTools: ChatCompletionTool[] = [
+export const adminEventTools: ChatCompletionFunctionTool[] = [
   {
     type: "function",
     function: {
@@ -131,5 +131,4 @@ export const adminEventTools: ChatCompletionTool[] = [
       },
     },
   },
-  ...eventLookupTools,
 ];

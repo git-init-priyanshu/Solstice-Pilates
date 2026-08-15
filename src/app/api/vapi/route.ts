@@ -1,6 +1,5 @@
 import { useDatabase as sheetApi } from "@/lib/database";
-import { executeBookingTool } from "@/lib/tools/bookingToolExecutor";
-import { executeEventTool } from "@/lib/tools/eventToolExecutor";
+import { runTool } from "@/lib/tools/registry";
 import type { OpenAIChatMessage } from "@/types/openai.types";
 import type { VapiRoutePayload } from "@/types/vapi.types";
 
@@ -119,34 +118,12 @@ export async function POST(request: Request) {
             parameters = toolCall.function.arguments;
           }
 
-          const assistantToolCall = {
-            id: toolCallId,
-            type: "function" as const,
-            function: {
-              arguments: JSON.stringify(parameters),
-              name: toolName,
-            },
-          };
-
-          const result =
-            toolName === "list_events_in_range"
-              ? await executeEventTool(assistantToolCall)
-              : toolName === "request_human_handoff"
-                ? {
-                    ok: true,
-                    message: "request_human_handoff completed",
-                    data: {
-                      reason:
-                        typeof parameters.reason === "string"
-                          ? parameters.reason
-                          : "",
-                    },
-                    intent: "human_handoff",
-                  }
-                : await executeBookingTool(assistantToolCall, {
-                    chatId,
-                    userId,
-                  });
+          const result = await runTool(
+            toolName,
+            JSON.stringify(parameters),
+            "voice",
+            { chatId, userId },
+          );
 
           if (!result.ok) {
             results.push({
